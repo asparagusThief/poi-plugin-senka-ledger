@@ -79,5 +79,7 @@
   "nextPage": "下一页",
   "page": "{{page}} / {{pages}}",
   "recordRange": "第 {{start}}–{{end}} 笔，共 {{count}} 笔",
-  "recordCount": "{{count}} 笔记录"
+  "recordCount": "{{count}} 笔记录",
+  "total": "总计",
+  "rankChange": "较上次刷新"
 }

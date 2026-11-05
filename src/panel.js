@@ -63,6 +63,7 @@ function createPanel(React, service) {
     const [start] = monthBounds(month, zone)
     const selectedStart = selected ? start + (Number(selected.day.slice(-2)) - 1) * DAY : null
     const unknown = stats.unknown.filter(e => !selected || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at)
+    const unknownTotal = unknown.reduce((sum, e) => sum + e.amount, 0)
     const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage)
     const offset = (new Date(month + '-01T00:00:00Z').getUTCDay() + 6) % 7
     React.useEffect(() => {
@@ -85,12 +86,26 @@ function createPanel(React, service) {
       try { service.export(account, month, zone, type, language); setExportError('') } catch (error) { setExportError(error.message) }
     }
     const failure = status.error || entry?.error || exportError
+    const changeText = value => value === null ? '—' : `${value > 0 ? '+' : ''}${fmt(value)}`
     const detailsTitle = detailKind === 'unknown' ? t('unknown') : `${selected?.day || month} · ${slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })}`
+    const rankingPanel = h('details', { className: 'ranking', 'aria-label': t('rankTitle') },
+      h('summary', { className: 'rank-summary' }, h('h3', null, t('rankTitle')), h('span', { className: 'rank-own' },
+        own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : t('rankPending'),
+        own && h('span', { className: 'rank-change', title: t('rankChange'), 'data-ranking-change': 'self' }, ` Δ ${changeText(own.change)}`))),
+      ranks.rows.length ? h('div', { className: 'scroll' }, h('table', { className: 'rank-table', 'data-table': 'ranking' },
+        th(['rankNo', 'rankScore', 'rankChange', 'rankGap', 'rankReadAt']), h('tbody', null, ...rankRows.map(rank => {
+          const row = ranks.rows.find(r => r.rank === rank)
+          const gap = row && own ? row.score - own.score : null
+          return h('tr', { key: rank, className: row?.self ? 'rank-own' : '' }, h('td', null, `#${rank}${row?.self ? ' · ' + t('rankSelf') : ''}`),
+            h('td', null, row ? fmt(row.score) : '—'), h('td', { 'data-ranking-change': rank }, row ? changeText(row.change) : '—'),
+            h('td', null, gap === null || row.self ? '—' : changeText(gap)), h('td', null, row ? stamp(row.at) : '—'))
+        })))) : h('p', { className: 'muted empty' }, t('rankWaiting')))
     return h('div', { className: 'sl-shell', ref: root }, h('main', { className: 'sl', 'data-view': selected ? 'day' : 'month', lang: language }, h('style', null, style),
       h('div', { className: 'top' }, h('div', { className: 'brand' }, createIcon(React), h('h2', null, t('Senka Ledger'))), h('span', { className: 'tag' }, t(failure ? 'storageError' : status.account ? 'recording' : 'waiting'))),
       failure && h('p', { role: 'alert', className: 'error' }, errorText(failure, t)),
       h('div', { className: 'workspace' },
         h('section', { className: 'activity-pane' },
+          rankingPanel,
           selected ? h('div', { className: 'top section-head navigation' },
             h('button', { onClick: back, 'data-action': 'back' }, '← ' + t('back')), h('h3', null, selected.day),
             h('div', { className: 'navigation' }, h('button', { disabled: selected === stats.days[0], onClick: () => openDay(stats.days[stats.days.indexOf(selected) - 1].day) }, t('prevDay')),
@@ -103,10 +118,10 @@ function createPanel(React, service) {
               'aria-label': `${d.day} · ${t('normal')} ${tileNumber(d.normal)}`, style: tileStyle(d.normal, maxDay), onClick: () => openDay(d.day) },
               h('span', { className: 'tile-label' }, Number(d.day.slice(-2))), h('span', { className: 'tile-value' }, tileNumber(d.normal)))))) :
             h(React.Fragment, null, h('h3', { className: 'section-head' }, t('hourly')),
-              h('div', { className: 'hours', 'aria-label': t('hourly') }, ...selected.slots.map((value, hour) => h('button', { key: hour, className: 'tile', 'data-hour': hour,
+              h('div', { className: 'scroll' }, h('div', { className: 'hours', 'aria-label': t('hourly') }, ...selected.slots.map((value, hour) => h('button', { key: hour, className: 'tile', 'data-hour': hour,
                 title: `${String(hour).padStart(2, '0')}:00 · ${tileNumber(value)}`, 'aria-label': `${selected.day} ${hour}:00 · ${tileNumber(value)}`, 'aria-pressed': slot === hour,
                 style: tileStyle(value, maxHour), onClick: () => openDetails('normal', hour) },
-                h('span', { className: 'tile-label' }, `${String(hour).padStart(2, '0')}:00`), h('span', { className: 'tile-value' }, tileNumber(value))))),
+                h('span', { className: 'tile-label' }, `${String(hour).padStart(2, '0')}:00`), h('span', { className: 'tile-value' }, tileNumber(value)))))),
               h('button', { className: 'detail-trigger', 'data-action': 'details', onClick: () => openDetails('normal') }, t('openDetails'), ' · ', t('recordCount', { count: selected.events.length })))),
         h('aside', { className: 'summary-pane' },
           h('div', { className: 'controls' },
@@ -116,14 +131,11 @@ function createPanel(React, service) {
             h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => { setZone(e.target.value); setSlot(null); closeDetails() } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
             h('button', { disabled: !account, onClick: () => download('csv') }, t('exportCSV')), h('button', { disabled: !account, onClick: () => download('json') }, t('backupJSON'))),
           h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
-          h('details', { className: 'ranking', 'aria-label': t('rankTitle') }, h('summary', { className: 'rank-summary' }, h('h3', null, t('rankTitle')), h('span', { className: 'rank-own' }, own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : t('rankPending'))),
-            ranks.rows.length ? h('div', { className: 'scroll' }, h('table', { className: 'rank-table', 'data-table': 'ranking' }, th(['rankNo', 'rankScore', 'rankGap', 'rankReadAt']), h('tbody', null, ...rankRows.map(rank => {
-              const row = ranks.rows.find(r => r.rank === rank)
-              const gap = row && own ? row.score - own.score : null
-              return h('tr', { key: rank, className: row?.self ? 'rank-own' : '' }, h('td', null, `#${rank}${row?.self ? ' · ' + t('rankSelf') : ''}`), h('td', null, row ? fmt(row.score) : '—'), h('td', null, gap === null || row.self ? '—' : `${gap > 0 ? '+' : ''}${fmt(gap)}`), h('td', null, row ? stamp(row.at) : '—'))
-            })))) : h('p', { className: 'muted empty' }, t('rankWaiting'))),
-          h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') }, h('span', null, t('unknown')), h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
-      h('div', { className: 'foot' }, 'v0.2.1'),
+          h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') },
+            h('span', { className: 'unknown-heading card-label' }, t('unknown')),
+            h('span', { className: 'unknown-total', 'data-summary': 'unknownTotal' }, t('total'), ' ', h('strong', { className: 'amber value' }, fmt(unknownTotal))),
+            h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
+      h('div', { className: 'foot' }, 'v0.2.2'),
       h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
         onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
         detailKind && h(React.Fragment, null,

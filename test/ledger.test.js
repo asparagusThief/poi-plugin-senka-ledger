@@ -19,6 +19,7 @@ test('midnight gap stays in its interval; only current battle appears today', ()
   assert.equal(report.days[4].total, 0.7)
   assert.equal(report.days[4].slots[1], 0.7)
   assert.equal(report.unknownWithinMonth, 6.3)
+  assert.equal(report.unknownTotal, 6.3)
   assert.equal(report.unknown[0].from, at('2026-11-04T22:00:00'))
 })
 test('port reconnect never puts an offline delta into login hour', () => {
@@ -37,6 +38,7 @@ test('cross-month unknown totals remain unallocated in both months and survive y
     assert.equal(report.total, 0)
     assert.equal(report.unknownWithinMonth, 0)
     assert.equal(report.unknownAcrossMonths, 14)
+    assert.equal(report.unknownTotal, 14)
   }
   assert.deepEqual(months(state, 'Asia/Tokyo'), ['2027-01', '2026-12'])
 })

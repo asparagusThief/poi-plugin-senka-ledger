@@ -47,6 +47,7 @@ test('ranking periods cross months at 03:00 JST and reset the decoder between up
   assert.equal(period(at('2026-12-01T02:59:59')), at('2026-11-30T15:00:00'))
   assert.equal(period(at('2026-12-01T03:00:00')), at('2026-12-01T03:00:00'))
   assert.equal(period(at('2026-12-01T14:59:59')), at('2026-12-01T03:00:00'))
+  assert.equal(period(at('2026-12-01T15:00:00')), at('2026-12-01T15:00:00'))
   const reader = createRankingReader()
   const old = readRanking(reader, page(1), at('2026-12-01T02:59:00'), 'Admiral', '123')
   assert.equal(snapshot([old], '2026-11').rows.length, 3)
@@ -73,4 +74,45 @@ test('501 is no longer an anchor, but an actual own rank of 501 remains visible'
   assert.deepEqual(snapshot([legacy], '2026-11').rows.map(e => e.rank), [500])
   legacy.entries[1].self = true
   assert.deepEqual(snapshot([legacy], '2026-11').rows.map(e => e.rank), [500, 501])
+})
+const record = (time, entries) => ({ v: 1, type: 'ranking', at: at(time), period: period(at(time)), entries })
+test('refresh change compares the exact previous 03:00/15:00 period and follows own identity across rank changes', () => {
+  const history = [
+    record('2026-11-05T03:10:00', [{ rank: 1, score: 7000, self: false }, { rank: 250, score: 3000, self: true }]),
+    record('2026-11-05T15:10:00', [{ rank: 1, score: 7100, self: false }, { rank: 240, score: 3150, self: true }]),
+    record('2026-11-05T16:10:00', [{ rank: 1, score: 7100, self: false }, { rank: 240, score: 3180, self: true }])
+  ]
+  const result = snapshot(history, '2026-11')
+  assert.equal(result.rows.find(r => r.rank === 1).change, 100)
+  const own = result.rows.find(r => r.self)
+  assert.equal(own.rank, 240)
+  assert.equal(own.previousScore, 3000)
+  assert.equal(own.change, 180)
+  assert.equal(own.previousPeriod, at('2026-11-05T03:00:00'))
+})
+test('a missed refresh is left unknown instead of comparing the last available day', () => {
+  const history = [
+    record('2026-11-05T15:01:00', [{ rank: 1, score: 7000, self: false }, { rank: 250, score: 3000, self: true }]),
+    record('2026-11-06T15:01:00', [{ rank: 1, score: 7300, self: false }, { rank: 240, score: 3200, self: true }])
+  ]
+  assert.ok(snapshot(history, '2026-11').rows.every(r => r.change === null && r.previousScore === null))
+})
+test('03:00 refresh compares against the previous day at 15:00, including month and year boundaries', () => {
+  const history = [
+    record('2026-12-31T15:10:00', [{ rank: 1, score: 7000, self: false }, { rank: 250, score: 5000, self: true }]),
+    record('2027-01-01T03:10:00', [{ rank: 1, score: 800, self: false }, { rank: 240, score: 200, self: true }])
+  ]
+  const own = snapshot(history, '2027-01').rows.find(r => r.self)
+  assert.equal(own.change, -4800)
+  assert.equal(own.previousPeriod, at('2026-12-31T15:00:00'))
+})
+test('the previous refresh must contain the requested anchor or the own entry', () => {
+  const history = [
+    record('2026-11-05T03:01:00', [{ rank: 1, score: 7000, self: false }]),
+    record('2026-11-05T15:01:00', [{ rank: 1, score: 7100, self: false }, { rank: 5, score: 6800, self: false }, { rank: 240, score: 3200, self: true }])
+  ]
+  const rows = snapshot(history, '2026-11').rows
+  assert.equal(rows.find(r => r.rank === 1).change, 100)
+  assert.equal(rows.find(r => r.rank === 5).change, null)
+  assert.equal(rows.find(r => r.self).change, null)
 })

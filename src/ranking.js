@@ -45,14 +45,28 @@ function readRanking(reader, body, at, nickname, account) {
 }
 function snapshot(history, month) {
   const rows = new Map()
+  const periods = new Map()
   let lastAt = null
   for (const record of history || []) {
+    let previous = periods.get(record.period)
+    if (!previous) { previous = { rows: new Map(), at: null }; periods.set(record.period, previous) }
+    if (previous.at === null || record.at >= previous.at) {
+      if (record.entries.some(e => e.self)) for (const old of previous.rows.values()) old.self = false
+      for (const entry of record.entries) previous.rows.set(entry.rank, { ...entry })
+      previous.at = record.at
+    }
     if (parts(record.period).month !== month) continue
     if (lastAt !== null && record.at < lastAt) continue
     if (record.entries.some(e => e.self)) for (const old of rows.values()) old.self = false
     for (const entry of record.entries) rows.set(entry.rank, { ...entry, at: entry.at ?? record.at, period: record.period })
     lastAt = record.at
   }
-  return { rows: [...rows.values()].filter(e => e.self || ANCHORS.includes(e.rank)).sort((a, b) => a.rank - b.rank), at: lastAt }
+  const result = [...rows.values()].filter(e => e.self || ANCHORS.includes(e.rank)).sort((a, b) => a.rank - b.rank).map(row => {
+    const previousPeriod = row.period - 12 * HOUR
+    const previousRows = periods.get(previousPeriod)?.rows
+    const previous = row.self ? [...(previousRows?.values() || [])].find(e => e.self) : previousRows?.get(row.rank)
+    return { ...row, previousPeriod, previousScore: previous?.score ?? null, change: previous ? row.score - previous.score : null }
+  })
+  return { rows: result, at: lastAt }
 }
 module.exports = { ROW_FACTORS, ANCHORS, RANKING_PATH, period, createRankingReader, readRanking, snapshot }

@@ -79,5 +79,7 @@
   "nextPage": "다음 페이지",
   "page": "{{page}} / {{pages}}",
   "recordRange": "{{count}}건 중 {{start}}–{{end}}건",
-  "recordCount": "{{count}}건의 기록"
+  "recordCount": "{{count}}건의 기록",
+  "total": "합계",
+  "rankChange": "이전 갱신 대비"
 }

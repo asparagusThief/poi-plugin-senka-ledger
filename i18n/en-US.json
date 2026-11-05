@@ -79,5 +79,7 @@
   "nextPage": "Next",
   "page": "{{page}} / {{pages}}",
   "recordRange": "{{start}}–{{end}} of {{count}}",
-  "recordCount": "{{count}} records"
+  "recordCount": "{{count}} records",
+  "total": "Total",
+  "rankChange": "Since previous refresh"
 }

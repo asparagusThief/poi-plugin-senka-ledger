@@ -33,6 +33,7 @@ for(let d=1;d<=5;d++){
 apply(state,{v:1,type:'bonus',kind:'eo',at:at('2026-11-04T20:12:32'),amount:200,mapId:55,questId:null,key:'eo:2026-11:55',label:'5-5 · EO 奖励'});
 apply(state,{v:1,type:'bonus',kind:'quest',at:at('2026-11-05T16:22:30'),amount:350,mapId:null,questId:854,key:'quest:2026:2:854',label:'Z作战前段 · 任务 854'});
 apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
+apply(state,{v:1,type:'ranking',at:at('2026-11-05T03:30:00'),period:at('2026-11-05T03:00:00'),entries:[[1,8800],[5,8300],[20,7000],[100,4500],[300,3000],[500,2700]].map(([rank,score])=>({rank,score,self:rank===300}))});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800]].map(([rank,score])=>({rank,score,self:rank===250}))});
 state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:10:00'),amount:0.14,exp:200,activity:'practice',mapId:null,node:null,rank:'S',label:'演习 · S'});
 if(params.has('long'))for(let i=0;i<1050;i++)state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:00:00')+i*1000,amount:0.07,exp:100,mapId:71,node:4,rank:'S'});
@@ -60,12 +61,16 @@ async function preview(){
   const report=require('./model').summarize(state,'2026-11');
   for(const d of report.days)assert(doc.querySelector('[data-day="'+d.day+'"] .tile-value').textContent===tileNumber(d.normal),'Daily value mismatch');
   assert(!doc.querySelector('[data-table="unknown"]'),'Unknown list must not fill the main view');
+  assert(doc.querySelector('[data-summary="unknownTotal"] .value').textContent==='9.80','Unrecorded total must be visible before opening details');
   doc.querySelector('[data-action="unknown"]').click();await pause();
   assert(doc.querySelector('dialog').open&&doc.querySelectorAll('[data-table="unknown"] tbody tr').length===1,'Unknown dialog failed');
   doc.querySelector('[data-action="close-details"]').click();await pause();
   assert(!doc.querySelector('dialog').open,'Unknown dialog did not close');
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');
   assert(doc.querySelector('[data-table="ranking"]').textContent.includes('#250'),'Ranking score missing');
+  assert(doc.querySelector('[data-ranking-change="self"]').textContent.includes('+200.00'),'Previous-refresh change missing');
+  assert(doc.querySelector('[data-ranking-change="1"]').textContent==='+200.00','Anchor refresh change missing');
+  assert(doc.querySelector('.activity-pane .ranking')&&!doc.querySelector('.summary-pane .ranking'),'Ranking must be above the activity tiles');
   assert(!doc.querySelector('[data-table="ranking"]').textContent.includes('#501'),'501 anchor must be removed');
   doc.querySelector('[data-day="2026-11-04"]').click();await pause();
   assert(doc.querySelectorAll('[data-hour]').length===24&&!doc.querySelector('.calendar'),'Secondary day view failed');
@@ -108,8 +113,10 @@ async function preview(){
  for(const el of doc.querySelectorAll('.tile-value,.tile-label'))assert(el.scrollWidth<=el.clientWidth+1,'Tile text overflow');
  assert(doc.documentElement.scrollWidth<=doc.defaultView.innerWidth,'Page horizontal overflow');
  const left=doc.querySelector('.activity-pane').getBoundingClientRect(),right=doc.querySelector('.summary-pane').getBoundingClientRect();
- const wide=doc.querySelector('.sl').clientWidth-24>640;
- assert(wide?right.left>=left.right-1:right.top>=left.bottom-1,'Activity and summaries overlap or are in the wrong order');
+ assert(right.left>=left.right-1,'Small panels must also keep summaries on the right');
+ const rankingBox=doc.querySelector('.ranking').getBoundingClientRect(),tiles=doc.querySelector('.calendar,.hours').getBoundingClientRect();
+ assert(rankingBox.bottom<=tiles.top,'Ranking must be above the tiles');
+ for(const el of doc.querySelectorAll('.tile-value'))assert(parseFloat(doc.defaultView.getComputedStyle(el).fontSize)<=12,'Senka values must use the smaller shared font size');
  for(const tile of doc.querySelectorAll('.tile'))assert(tile.getBoundingClientRect().height<=70,'Tiles should be compact');
  shell.scrollTop=0;
  if(params.get('view')==='details'){doc.querySelector('[data-action="details"]').click();await pause();assert(doc.querySelector('dialog').open,'Final detail dialog failed')}

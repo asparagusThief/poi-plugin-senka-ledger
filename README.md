@@ -6,11 +6,11 @@ A local senka ledger for **poi 12.0.1** with daily history, hourly details and r
 
 ## Features
 
-- A compact monthly calendar opens into daily and hourly views. Tiles stay on the left and filters, summaries and rankings stay on the right on wide panels; narrow panels stack them vertically. Date, time and score are centered.
+- A compact monthly calendar opens into daily and hourly views. Tiles stay on the left at every panel size, with rankings above them and filters and summaries on the right. Narrow calendars scroll within the left column. Date and time labels share one size; the smaller score values share another and stay centered.
 - Normal senka comes from each sortie or practice result's explicit Admiral EXP reward, using `EXP × 7 / 10000`. EO and quest rewards appear only in the summaries.
 - Details open in a separate modal dialog with its own scrolling and **50 records per page**, instead of filling the daily view with a long table. Click an hour for that hour's details, or use **View details** for the full day. Unrecorded gains also open in a dialog.
-- Unobserved EXP gains retain their possible interval and are excluded from login-day and login-hour activity. Unobserved EO and quest rewards are not inferred.
-- Ranking snapshots show your own score and positions **1, 5, 20, 100 and 500**, when those pages have been observed. Ranking scores are separate from activity totals.
+- Unobserved EXP gains retain their possible interval and show a visible total before opening their detail dialog. The total sums complete intervals in the current list, without allocating them to a particular day or month. They are excluded from login-day and login-hour activity. Unobserved EO and quest rewards are not inferred.
+- Ranking snapshots show your own score and positions **1, 5, 20, 100 and 500**, when those pages have been observed, plus each score's change since the preceding **03:00 or 15:00 JST** refresh. Ranking scores are separate from activity totals.
 - Independent scrolling works in poi's main panel and its **Open in window** portal. Narrow layouts wrap controls and summaries; wide tables and calendars can scroll horizontally without overlapping text.
 - Follows poi's language: English, Simplified Chinese, Traditional Chinese, Japanese or Korean. CSV headers, battle details and storage errors are localized as well.
 - Account-separated append-only journals, previous months, CSV export and complete JSON backup.
@@ -34,6 +34,8 @@ Enable the plugin and visit the home port to establish a live EXP baseline. Sele
 Practice rewards are identified as local activity when their explicit reward is present. Any extra cumulative EXP outside that reward remains unlocated. This fix applies to newly observed results; older unlocated records without a stored source cannot be safely reclassified.
 
 For ranking data, **open the ranking list inside the game** and visit the relevant pages, including your own entry. Expand the ranking section in the plugin to inspect scores and read times. The plugin observes normal game responses; it does not send ranking requests or operate the game. Same-name entries are not treated as yours when identity is ambiguous. Old snapshots keep their read time. At the start of a month, ranking responses read before 03:00 JST remain associated with the previous month.
+
+Refresh changes compare the exact preceding 12-hour ranking period, following your own entry even when your rank changes. Re-reading a page within one period does not replace that baseline. If the preceding period or entry was not recorded, the change shows `—`. Comparisons across a monthly reset can be negative.
 
 The plugin ID now matches the package name, correcting poi's active-plugin heading. Window, pin and favorite preferences from the previous ID are migrated. The journal location is unchanged.
 

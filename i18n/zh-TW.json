@@ -79,5 +79,7 @@
   "nextPage": "下一頁",
   "page": "{{page}} / {{pages}}",
   "recordRange": "第 {{start}}–{{end}} 筆，共 {{count}} 筆",
-  "recordCount": "{{count}} 筆記錄"
+  "recordCount": "{{count}} 筆記錄",
+  "total": "總計",
+  "rankChange": "較上次更新"
 }

@@ -45,6 +45,7 @@ function summarize(state, month, zone = 'Asia/Tokyo', minutes = 60) {
     if (e.kind === 'quest') quest += e.amount
   }
   return { days, total, normal, eo, quest, unknown,
+    unknownTotal: unknown.reduce((sum, e) => sum + e.amount, 0),
     unknownWithinMonth: unknown.filter(e => e.withinMonth).reduce((s, e) => s + e.amount, 0),
     unknownAcrossMonths: unknown.filter(e => !e.withinMonth).reduce((s, e) => s + e.amount, 0) }
 }

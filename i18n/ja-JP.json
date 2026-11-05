@@ -79,5 +79,7 @@
   "nextPage": "次のページ",
   "page": "{{page}} / {{pages}}",
   "recordRange": "{{count}} 件中 {{start}}–{{end}} 件",
-  "recordCount": "{{count}} 件の記録"
+  "recordCount": "{{count}} 件の記録",
+  "total": "合計",
+  "rankChange": "前回更新との差"
 }

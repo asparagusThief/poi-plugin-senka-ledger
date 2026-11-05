@@ -23,7 +23,7 @@ function fitNumbers(root) {
   if (calendar) {
     const context = root.ownerDocument.createElement('canvas').getContext('2d')
     const gap = parseFloat(view.getComputedStyle(calendar).columnGap) || 0
-    let required = 350
+    let required = 280
     for (const el of calendar.querySelectorAll('.tile-value')) {
       const tile = view.getComputedStyle(el.parentElement)
       context.font = '650 12px ' + view.getComputedStyle(el).fontFamily
