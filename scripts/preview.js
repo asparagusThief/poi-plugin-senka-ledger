@@ -1,13 +1,13 @@
 'use strict'
 
 // node scripts/preview.js <React 18 UMD directory> <output.html>
-// Query options: lang=en-US, view=day, portal=1, check=1, stress=1.
+// Query options: lang=en-US, view=day|details, portal=1, check=1, stress=1, long=1.
 const fs = require('fs')
 const path = require('path')
 const root = path.resolve(__dirname, '..')
 const runtime = path.resolve(process.argv[2] || '.')
 const output = path.resolve(process.argv[3] || 'preview.html')
-const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'i18n', 'layout', 'icon', 'styles']
+const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'i18n', 'layout', 'icon', 'styles']
 let bundle = names.map(name => `modules['./${name}']=function(module,exports,require){\n${fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')}\n};`).join('\n')
 for (const language of ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) bundle += `\nmodules['../i18n/${language}.json']=function(module){module.exports=${fs.readFileSync(path.join(root, 'i18n', language + '.json'), 'utf8')};};`
 const react = fs.readFileSync(path.join(runtime, 'react.production.min.js'), 'utf8')
@@ -33,7 +33,9 @@ for(let d=1;d<=5;d++){
 apply(state,{v:1,type:'bonus',kind:'eo',at:at('2026-11-04T20:12:32'),amount:200,mapId:55,questId:null,key:'eo:2026-11:55',label:'5-5 · EO 奖励'});
 apply(state,{v:1,type:'bonus',kind:'quest',at:at('2026-11-05T16:22:30'),amount:350,mapId:null,questId:854,key:'quest:2026:2:854',label:'Z作战前段 · 任务 854'});
 apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
-apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800],[501,2799]].map(([rank,score])=>({rank,score,self:rank===250}))});
+apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800]].map(([rank,score])=>({rank,score,self:rank===250}))});
+state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:10:00'),amount:0.14,exp:200,activity:'practice',mapId:null,node:null,rank:'S',label:'演习 · S'});
+if(params.has('long'))for(let i=0;i<1050;i++)state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:00:00')+i*1000,amount:0.07,exp:100,mapId:71,node:4,rank:'S'});
 if(params.has('stress'))for(const e of state.events)if(e.source==='local'&&e.kind==='normal')e.amount*=100000;
 let language=normalize(params.get('lang')||'zh-CN');const subscribers=new Set();
 const service={snapshot:()=>({account:'12345678',accounts:['12345678'],language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:()=>({state}),export:()=>{doc.body.dataset.exported='yes'}};
@@ -57,14 +59,36 @@ async function preview(){
   assert(doc.querySelectorAll('[data-day]').length===30,'Monthly date count failed');
   const report=require('./model').summarize(state,'2026-11');
   for(const d of report.days)assert(doc.querySelector('[data-day="'+d.day+'"] .tile-value').textContent===tileNumber(d.normal),'Daily value mismatch');
-  assert(doc.querySelectorAll('[data-table="unknown"] tbody tr').length===1,'Unknown EO leaked');
+  assert(!doc.querySelector('[data-table="unknown"]'),'Unknown list must not fill the main view');
+  doc.querySelector('[data-action="unknown"]').click();await pause();
+  assert(doc.querySelector('dialog').open&&doc.querySelectorAll('[data-table="unknown"] tbody tr').length===1,'Unknown dialog failed');
+  doc.querySelector('[data-action="close-details"]').click();await pause();
+  assert(!doc.querySelector('dialog').open,'Unknown dialog did not close');
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');
   assert(doc.querySelector('[data-table="ranking"]').textContent.includes('#250'),'Ranking score missing');
+  assert(!doc.querySelector('[data-table="ranking"]').textContent.includes('#501'),'501 anchor must be removed');
   doc.querySelector('[data-day="2026-11-04"]').click();await pause();
   assert(doc.querySelectorAll('[data-hour]').length===24&&!doc.querySelector('.calendar'),'Secondary day view failed');
   for(let hour=0;hour<24;hour++)assert(doc.querySelector('[data-hour="'+hour+'"] .tile-value').textContent===tileNumber(report.days[3].slots[hour]),'Hour value mismatch');
   doc.querySelector('[data-hour="20"]').click();await pause();
+  assert(doc.querySelector('dialog').open&&doc.querySelector('dialog').ownerDocument===doc,'Hour details must open in this window');
   assert(!doc.querySelector('[data-table="details"]').textContent.includes('EO'),'EO leaked into details');
+  doc.querySelector('[data-action="close-details"]').click();await pause();
+  doc.querySelector('[data-action="details"]').click();await pause();
+  assert(doc.querySelector('dialog').open,'Day detail dialog failed');
+  assert(doc.querySelectorAll('[data-table="details"] tbody tr').length===50,'Day details must be paginated');
+  const firstRow=doc.querySelector('[data-table="details"] tbody tr').textContent;
+  doc.querySelector('.dialog-body').scrollTop=doc.querySelector('.dialog-body').scrollHeight;
+  doc.querySelector('[data-action="next-page"]').click();await pause();
+  assert(doc.querySelector('[data-table="details"] tbody tr').textContent!==firstRow,'Pagination did not advance');
+  assert(doc.querySelector('.dialog-body').scrollTop===0,'New pages must start at the top');
+  doc.querySelector('[data-action="previous-page"]').click();await pause();
+  assert(doc.querySelector('[data-table="details"] tbody tr').textContent===firstRow,'Pagination did not return');
+  const body=doc.querySelector('.dialog-body');body.scrollTop=body.scrollHeight;await pause();
+  assert(body.scrollHeight<=body.clientHeight||body.scrollTop>0,'Details cannot scroll');
+  const dialogBox=doc.querySelector('dialog').getBoundingClientRect();
+  assert(dialogBox.top>=0&&dialogBox.bottom<=doc.defaultView.innerHeight,'Dialog exceeds window bounds');
+  doc.querySelector('[data-action="close-details"]').click();await pause();
   await select('zone','Asia/Shanghai');const shifted=require('./model').summarize(state,'2026-11','Asia/Shanghai');
   assert(doc.querySelector('[data-hour="19"] .tile-value').textContent===tileNumber(shifted.days[3].slots[19]),'Timezone failed');
   await select('zone','Asia/Tokyo');doc.querySelector('[data-action="back"]').click();await pause();
@@ -76,14 +100,20 @@ async function preview(){
   api.setLanguage(originalLanguage);await pause();
   doc.body.dataset.interactions='yes';
  }
- if(params.get('view')==='day'){doc.querySelector('[data-day="2026-11-05"]').click();await pause();doc.querySelector('[data-hour="16"]').click();await pause()}
+ if(['day','details'].includes(params.get('view'))){doc.querySelector('[data-day="2026-11-05"]').click();await pause()}
  const shell=doc.querySelector('.sl-shell');shell.scrollTop=shell.scrollHeight;await pause();
- assert(shell.scrollTop>0,'Panel cannot scroll');
+ assert(shell.scrollHeight<=shell.clientHeight||shell.scrollTop>0,'Panel cannot scroll');
  const foot=doc.querySelector('.foot').getBoundingClientRect(),box=shell.getBoundingClientRect();
  assert(foot.bottom<=box.bottom+1&&foot.top>=box.top,'Panel bottom is unreachable');
  for(const el of doc.querySelectorAll('.tile-value,.tile-label'))assert(el.scrollWidth<=el.clientWidth+1,'Tile text overflow');
  assert(doc.documentElement.scrollWidth<=doc.defaultView.innerWidth,'Page horizontal overflow');
- shell.scrollTop=0;doc.body.dataset.ready='yes';
+ const left=doc.querySelector('.activity-pane').getBoundingClientRect(),right=doc.querySelector('.summary-pane').getBoundingClientRect();
+ const wide=doc.querySelector('.sl').clientWidth-24>640;
+ assert(wide?right.left>=left.right-1:right.top>=left.bottom-1,'Activity and summaries overlap or are in the wrong order');
+ for(const tile of doc.querySelectorAll('.tile'))assert(tile.getBoundingClientRect().height<=70,'Tiles should be compact');
+ shell.scrollTop=0;
+ if(params.get('view')==='details'){doc.querySelector('[data-action="details"]').click();await pause();assert(doc.querySelector('dialog').open,'Final detail dialog failed')}
+ doc.body.dataset.ready='yes';
 }
 preview().catch(error=>{doc.body.dataset.testError=String(error)});
 `

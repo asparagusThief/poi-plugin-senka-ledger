@@ -7,6 +7,7 @@ const { snapshot: rankingSnapshot, ANCHORS } = require('./ranking')
 const { translator, normalize, errorText, battleText } = require('./i18n')
 const { bindPanel, fitNumbers } = require('./layout')
 const { createIcon } = require('./icon')
+const { paginate } = require('./details')
 const style = require('./styles')
 
 const colors = ['rgba(130,150,160,.13)', '#c4e9d8', '#81cdb2', '#36aa8f', '#087e70']
@@ -23,8 +24,12 @@ function createPanel(React, service) {
     const [day, setDay] = React.useState(null)
     const [viewAccount, setViewAccount] = React.useState('')
     const [slot, setSlot] = React.useState(null)
+    const [detailKind, setDetailKind] = React.useState(null)
+    const [detailPage, setDetailPage] = React.useState(0)
     const [exportError, setExportError] = React.useState('')
     const root = React.useRef(null)
+    const dialog = React.useRef(null)
+    const titleId = React.useId()
     const language = normalize(status.language)
     const t = translator(language)
     const fmt = n => n.toLocaleString(language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -35,6 +40,13 @@ function createPanel(React, service) {
       const view = root.current?.ownerDocument.defaultView
       if (view?.isWindowMode) root.current.ownerDocument.title = t('Senka Ledger')
     }, [language])
+    React.useEffect(() => {
+      if (detailKind && !dialog.current.open) dialog.current.showModal()
+      else if (!detailKind && dialog.current.open) dialog.current.close()
+    }, [detailKind])
+    React.useEffect(() => {
+      dialog.current?.querySelector('.dialog-body')?.scrollTo(0, 0)
+    }, [detailPage, detailKind, slot])
     const account = viewAccount || status.account || status.accounts[0] || ''
     const entry = service.entry(account)
     const state = entry?.state || createLedger()
@@ -51,6 +63,7 @@ function createPanel(React, service) {
     const [start] = monthBounds(month, zone)
     const selectedStart = selected ? start + (Number(selected.day.slice(-2)) - 1) * DAY : null
     const unknown = stats.unknown.filter(e => !selected || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at)
+    const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage)
     const offset = (new Date(month + '-01T00:00:00Z').getUTCDay() + 6) % 7
     React.useEffect(() => {
       fitNumbers(root.current)
@@ -64,61 +77,66 @@ function createPanel(React, service) {
       const text = formatTime(at, zone)
       return h('time', { className: 'stamp', dateTime: new Date(at).toISOString() }, h('span', null, text.slice(0, 10)), h('span', null, text.slice(11)))
     }
-    const back = () => { setDay(null); setSlot(null) }
-    const openDay = value => { setDay(value); setSlot(null) }
+    const closeDetails = () => setDetailKind(null)
+    const back = () => { setDay(null); setSlot(null); closeDetails() }
+    const openDay = value => { setDay(value); setSlot(null); closeDetails() }
+    const openDetails = (kind, hour = null) => { setSlot(hour); setDetailPage(0); setDetailKind(kind) }
     const download = type => {
       try { service.export(account, month, zone, type, language); setExportError('') } catch (error) { setExportError(error.message) }
     }
     const failure = status.error || entry?.error || exportError
+    const detailsTitle = detailKind === 'unknown' ? t('unknown') : `${selected?.day || month} · ${slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })}`
     return h('div', { className: 'sl-shell', ref: root }, h('main', { className: 'sl', 'data-view': selected ? 'day' : 'month', lang: language }, h('style', null, style),
       h('div', { className: 'top' }, h('div', { className: 'brand' }, createIcon(React), h('h2', null, t('Senka Ledger'))), h('span', { className: 'tag' }, t(failure ? 'storageError' : status.account ? 'recording' : 'waiting'))),
       failure && h('p', { role: 'alert', className: 'error' }, errorText(failure, t)),
-      h('div', { className: 'controls' },
-        h('label', null, t('account'), h('select', { 'aria-label': t('account'), 'data-control': 'account', value: account, onChange: e => { setViewAccount(e.target.value); back() } },
-          !account && h('option', { value: '' }, t('waiting')), ...status.accounts.map(id => h('option', { key: id, value: id }, id + (id === status.account ? ' · ' + t('current') : ''))))),
-        h('label', null, t('month'), h('select', { 'aria-label': t('month'), 'data-control': 'month', value: month, onChange: e => { setMonth(e.target.value); back() } }, ...allMonths.map(m => h('option', { key: m }, m)))),
-        h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => { setZone(e.target.value); setSlot(null) } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
-        h('button', { disabled: !account, onClick: () => download('csv') }, t('exportCSV')),
-        h('button', { disabled: !account, onClick: () => download('json') }, t('backupJSON'))),
-      selected && h('div', { className: 'top section-head navigation' },
-        h('button', { onClick: back, 'data-action': 'back' }, '← ' + t('back')), h('h3', null, selected.day),
-        h('div', { className: 'navigation' },
-          h('button', { disabled: selected === stats.days[0], onClick: () => openDay(stats.days[stats.days.indexOf(selected) - 1].day) }, t('prevDay')),
-          h('button', { disabled: selected === stats.days[stats.days.length - 1], onClick: () => openDay(stats.days[stats.days.indexOf(selected) + 1].day) }, t('nextDay')))),
-      h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
-      h('details', { className: 'section ranking', 'aria-label': t('rankTitle') }, h('summary', { className: 'rank-summary' }, h('h3', null, t('rankTitle')), h('span', { className: 'rank-own' }, own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : t('rankPending'))),
-        ranks.rows.length ? h(React.Fragment, null,
-          h('div', { className: 'rank-meta' }, h('span', { className: 'rank-own' }, own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : `${t('official')} · ${t('rankPending')}`)),
-          h('div', { className: 'scroll' }, h('table', { className: 'rank-table', 'data-table': 'ranking' }, th(['rankNo', 'rankScore', 'rankGap', 'rankReadAt']), h('tbody', null, ...rankRows.map(rank => {
-            const row = ranks.rows.find(r => r.rank === rank)
-            const gap = row && own ? row.score - own.score : null
-            return h('tr', { key: rank, className: row?.self ? 'rank-own' : '' }, h('td', null, `#${rank}${row?.self ? ' · ' + t('rankSelf') : ''}`), h('td', null, row ? fmt(row.score) : '—'), h('td', null, gap === null || row.self ? '—' : `${gap > 0 ? '+' : ''}${fmt(gap)}`), h('td', null, row ? stamp(row.at) : '—'))
-          }))))) : h('p', { className: 'muted empty' }, t('rankWaiting'))),
-      !selected ? h('section', { className: 'section' },
-        h('h3', { className: 'section-head' }, `${month} · ${t('daily')}`),
-        h('div', { className: 'scroll' }, h('div', { className: 'calendar', 'aria-label': t('daily') },
-          ...t('weekdays').map((s, i) => h('div', { key: i, className: 'weekday' }, s)),
-          ...Array.from({ length: offset }, (_, i) => h('div', { key: `blank-${i}`, 'aria-hidden': true })),
-          ...stats.days.map(d => h('button', { key: d.day, className: 'tile', 'data-day': d.day, title: `${d.day} · ${tileNumber(d.normal)}`,
-            'aria-label': `${d.day} · ${t('normal')} ${tileNumber(d.normal)}`, style: tileStyle(d.normal, maxDay), onClick: () => openDay(d.day) },
-            h('span', { className: 'tile-label' }, Number(d.day.slice(-2))), h('span', { className: 'tile-value' }, tileNumber(d.normal))))))) :
-        h('section', { className: 'section' }, h('h3', { className: 'section-head' }, t('hourly')),
-          h('div', { className: 'hours', 'aria-label': t('hourly') }, ...selected.slots.map((value, hour) => h('button', { key: hour, className: 'tile', 'data-hour': hour,
-            title: `${String(hour).padStart(2, '0')}:00 · ${tileNumber(value)}`, 'aria-label': `${selected.day} ${hour}:00 · ${tileNumber(value)}`, 'aria-pressed': slot === hour,
-            style: tileStyle(value, maxHour), onClick: () => setSlot(slot === hour ? null : hour) },
-            h('span', { className: 'tile-label' }, `${String(hour).padStart(2, '0')}:00`), h('span', { className: 'tile-value' }, tileNumber(value))))),
-          h('div', { className: 'top section section-head' }, h('h3', null, slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })),
-            slot !== null && h('button', { onClick: () => setSlot(null), 'data-action': 'all' }, t('viewAll'))),
-          h('div', { className: 'scroll' }, h('table', { className: 'details-table', 'data-table': 'details', 'aria-label': t('dayDetail') }, th(['time', 'experience', 'senka', 'map']),
-            h('tbody', null, ...timeline.slice(0, 300).map(e => h('tr', { key: e.id }, h('td', null, formatTime(e.at, zone).slice(11)), h('td', null, e.exp.toLocaleString(language)), h('td', null, fmt(e.amount)), h('td', null, battleText(e, t)))),
-              !timeline.length && h('tr', null, h('td', { colSpan: 4, className: 'empty' }, t('empty')))))),
-          timeline.length > 300 && h('p', { className: 'muted' }, t('shown', { count: timeline.length, limit: 300 }))),
-      h('section', { className: 'section' }, h('h3', { className: 'section-head' }, t('unknown')),
-        h('div', { className: 'scroll' }, h('table', { className: 'unknown-table', 'data-table': 'unknown', 'aria-label': t('unknown') }, th(['interval', 'detected', 'senka']), h('tbody', null,
-          ...unknown.slice(0, 200).map(e => h('tr', { key: e.id }, h('td', null, stamp(e.from), '→', stamp(e.to)), h('td', null, stamp(e.at)), h('td', { className: 'amber' }, fmt(e.amount)))),
-          !unknown.length && h('tr', null, h('td', { colSpan: 3, className: 'empty' }, t('empty')))))),
-        unknown.length > 200 && h('p', { className: 'muted' }, t('shown', { count: unknown.length, limit: 200 }))),
-      h('div', { className: 'foot' }, 'v0.2.0')))
+      h('div', { className: 'workspace' },
+        h('section', { className: 'activity-pane' },
+          selected ? h('div', { className: 'top section-head navigation' },
+            h('button', { onClick: back, 'data-action': 'back' }, '← ' + t('back')), h('h3', null, selected.day),
+            h('div', { className: 'navigation' }, h('button', { disabled: selected === stats.days[0], onClick: () => openDay(stats.days[stats.days.indexOf(selected) - 1].day) }, t('prevDay')),
+              h('button', { disabled: selected === stats.days[stats.days.length - 1], onClick: () => openDay(stats.days[stats.days.indexOf(selected) + 1].day) }, t('nextDay')))) :
+            h('h3', { className: 'section-head' }, `${month} · ${t('daily')}`),
+          !selected ? h('div', { className: 'scroll' }, h('div', { className: 'calendar', 'aria-label': t('daily') },
+            ...t('weekdays').map((s, i) => h('div', { key: i, className: 'weekday' }, s)),
+            ...Array.from({ length: offset }, (_, i) => h('div', { key: `blank-${i}`, 'aria-hidden': true })),
+            ...stats.days.map(d => h('button', { key: d.day, className: 'tile', 'data-day': d.day, title: `${d.day} · ${tileNumber(d.normal)}`,
+              'aria-label': `${d.day} · ${t('normal')} ${tileNumber(d.normal)}`, style: tileStyle(d.normal, maxDay), onClick: () => openDay(d.day) },
+              h('span', { className: 'tile-label' }, Number(d.day.slice(-2))), h('span', { className: 'tile-value' }, tileNumber(d.normal)))))) :
+            h(React.Fragment, null, h('h3', { className: 'section-head' }, t('hourly')),
+              h('div', { className: 'hours', 'aria-label': t('hourly') }, ...selected.slots.map((value, hour) => h('button', { key: hour, className: 'tile', 'data-hour': hour,
+                title: `${String(hour).padStart(2, '0')}:00 · ${tileNumber(value)}`, 'aria-label': `${selected.day} ${hour}:00 · ${tileNumber(value)}`, 'aria-pressed': slot === hour,
+                style: tileStyle(value, maxHour), onClick: () => openDetails('normal', hour) },
+                h('span', { className: 'tile-label' }, `${String(hour).padStart(2, '0')}:00`), h('span', { className: 'tile-value' }, tileNumber(value))))),
+              h('button', { className: 'detail-trigger', 'data-action': 'details', onClick: () => openDetails('normal') }, t('openDetails'), ' · ', t('recordCount', { count: selected.events.length })))),
+        h('aside', { className: 'summary-pane' },
+          h('div', { className: 'controls' },
+            h('label', null, t('account'), h('select', { 'aria-label': t('account'), 'data-control': 'account', value: account, onChange: e => { setViewAccount(e.target.value); back() } },
+              !account && h('option', { value: '' }, t('waiting')), ...status.accounts.map(id => h('option', { key: id, value: id }, id + (id === status.account ? ' · ' + t('current') : ''))))),
+            h('label', null, t('month'), h('select', { 'aria-label': t('month'), 'data-control': 'month', value: month, onChange: e => { setMonth(e.target.value); back() } }, ...allMonths.map(m => h('option', { key: m }, m)))),
+            h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => { setZone(e.target.value); setSlot(null); closeDetails() } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
+            h('button', { disabled: !account, onClick: () => download('csv') }, t('exportCSV')), h('button', { disabled: !account, onClick: () => download('json') }, t('backupJSON'))),
+          h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
+          h('details', { className: 'ranking', 'aria-label': t('rankTitle') }, h('summary', { className: 'rank-summary' }, h('h3', null, t('rankTitle')), h('span', { className: 'rank-own' }, own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : t('rankPending'))),
+            ranks.rows.length ? h('div', { className: 'scroll' }, h('table', { className: 'rank-table', 'data-table': 'ranking' }, th(['rankNo', 'rankScore', 'rankGap', 'rankReadAt']), h('tbody', null, ...rankRows.map(rank => {
+              const row = ranks.rows.find(r => r.rank === rank)
+              const gap = row && own ? row.score - own.score : null
+              return h('tr', { key: rank, className: row?.self ? 'rank-own' : '' }, h('td', null, `#${rank}${row?.self ? ' · ' + t('rankSelf') : ''}`), h('td', null, row ? fmt(row.score) : '—'), h('td', null, gap === null || row.self ? '—' : `${gap > 0 ? '+' : ''}${fmt(gap)}`), h('td', null, row ? stamp(row.at) : '—'))
+            })))) : h('p', { className: 'muted empty' }, t('rankWaiting'))),
+          h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') }, h('span', null, t('unknown')), h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
+      h('div', { className: 'foot' }, 'v0.2.1'),
+      h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
+        onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
+        detailKind && h(React.Fragment, null,
+          h('header', { className: 'dialog-header' }, h('h3', { id: titleId }, detailsTitle), h('button', { 'data-action': 'close-details', onClick: closeDetails }, t('close'))),
+          h('div', { className: 'dialog-toolbar' }, h('span', null, t('recordRange', { start: page.start, end: page.end, count: page.count })),
+            detailKind === 'normal' && slot !== null && h('button', { 'data-action': 'all', onClick: () => { setSlot(null); setDetailPage(0) } }, t('viewAll'))),
+          h('div', { className: 'dialog-body' }, h('table', { className: detailKind === 'unknown' ? 'unknown-table' : 'details-table', 'data-table': detailKind === 'unknown' ? 'unknown' : 'details' },
+            th(detailKind === 'unknown' ? ['interval', 'detected', 'senka'] : ['time', 'experience', 'senka', 'map']), h('tbody', null,
+              ...page.items.map(e => detailKind === 'unknown' ? h('tr', { key: e.id }, h('td', null, stamp(e.from), '→', stamp(e.to)), h('td', null, stamp(e.at)), h('td', { className: 'amber' }, fmt(e.amount))) :
+                h('tr', { key: e.id }, h('td', null, formatTime(e.at, zone).slice(11)), h('td', null, e.exp.toLocaleString(language)), h('td', null, fmt(e.amount)), h('td', null, battleText(e, t)))),
+              !page.items.length && h('tr', null, h('td', { colSpan: detailKind === 'unknown' ? 3 : 4, className: 'empty' }, t('empty')))))),
+          h('footer', { className: 'dialog-footer' }, h('button', { 'data-action': 'previous-page', disabled: page.page === 0, onClick: () => setDetailPage(page.page - 1) }, t('previousPage')),
+            h('span', null, t('page', { page: page.page + 1, pages: page.pages })), h('button', { 'data-action': 'next-page', disabled: page.page === page.pages - 1, onClick: () => setDetailPage(page.page + 1) }, t('nextPage')))))))
   }
 }
 module.exports = { createPanel }

@@ -6,10 +6,11 @@ A local senka ledger for **poi 12.0.1** with daily history, hourly details and r
 
 ## Features
 
-- A monthly calendar opens into daily and hourly views. Every tile shows its value; date, time and score are centered.
-- Normal senka comes from each battle's Admiral EXP, using `EXP × 7 / 10000`. EO and quest rewards appear only in the top summaries.
+- A compact monthly calendar opens into daily and hourly views. Tiles stay on the left and filters, summaries and rankings stay on the right on wide panels; narrow panels stack them vertically. Date, time and score are centered.
+- Normal senka comes from each sortie or practice result's explicit Admiral EXP reward, using `EXP × 7 / 10000`. EO and quest rewards appear only in the summaries.
+- Details open in a separate modal dialog with its own scrolling and **50 records per page**, instead of filling the daily view with a long table. Click an hour for that hour's details, or use **View details** for the full day. Unrecorded gains also open in a dialog.
 - Unobserved EXP gains retain their possible interval and are excluded from login-day and login-hour activity. Unobserved EO and quest rewards are not inferred.
-- Ranking snapshots show your own score and positions **1, 5, 20, 100, 500 and 501**, when those pages have been observed. Ranking scores are separate from activity totals.
+- Ranking snapshots show your own score and positions **1, 5, 20, 100 and 500**, when those pages have been observed. Ranking scores are separate from activity totals.
 - Independent scrolling works in poi's main panel and its **Open in window** portal. Narrow layouts wrap controls and summaries; wide tables and calendars can scroll horizontally without overlapping text.
 - Follows poi's language: English, Simplified Chinese, Traditional Chinese, Japanese or Korean. CSV headers, battle details and storage errors are localized as well.
 - Account-separated append-only journals, previous months, CSV export and complete JSON backup.
@@ -22,11 +23,15 @@ The screenshots use synthetic data.
 
 ![Daily and hourly details](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
 
+![Paginated detail dialog](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/details.png)
+
 ## Install and use
 
 Install **`poi-plugin-senka-ledger`** in poi's plugin manager, or install the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
 
-Enable the plugin and visit the home port to establish a live EXP baseline. Select a month, click a date, then click an hour to filter the normal-senka details. EO and quest rewards remain in the summaries.
+Enable the plugin and visit the home port to establish a live EXP baseline. Select a month, click a date, then click an hour to open the normal-senka detail dialog. EO and quest rewards remain in the summaries.
+
+Practice rewards are identified as local activity when their explicit reward is present. Any extra cumulative EXP outside that reward remains unlocated. This fix applies to newly observed results; older unlocated records without a stored source cannot be safely reclassified.
 
 For ranking data, **open the ranking list inside the game** and visit the relevant pages, including your own entry. Expand the ranking section in the plugin to inspect scores and read times. The plugin observes normal game responses; it does not send ranking requests or operate the game. Same-name entries are not treated as yours when identity is ambiguous. Old snapshots keep their read time. At the start of a month, ranking responses read before 03:00 JST remain associated with the previous month.
 

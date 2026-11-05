@@ -2,7 +2,7 @@
 
 const { HOUR, parts } = require('./time')
 const ROW_FACTORS = [8931, 1201, 1156, 5061, 4569, 4732, 3779, 4568, 5695, 4619, 4912, 5669, 6586]
-const ANCHORS = [1, 5, 20, 100, 500, 501]
+const ANCHORS = [1, 5, 20, 100, 500]
 const RANKING_PATH = '/kcsapi/api_req_ranking/mxltvkpyuklh'
 function period(at) {
   const shifted = new Date(at + 9 * HOUR)

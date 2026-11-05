@@ -9,7 +9,7 @@ test('all five languages have complete keys and matching interpolation variables
   for (const [language, data] of Object.entries(resources)) {
     assert.deepEqual(Object.keys(data).sort(), Object.keys(english).sort(), language)
     for (const key of Object.keys(english)) {
-      assert.deepEqual(String(data[key]).match(/\{\{\w+\}\}/g), String(english[key]).match(/\{\{\w+\}\}/g), language + ':' + key)
+      assert.deepEqual((String(data[key]).match(/\{\{\w+\}\}/g) || []).sort(), (String(english[key]).match(/\{\{\w+\}\}/g) || []).sort(), language + ':' + key)
     }
     assert.equal(data.weekdays.length, 7)
   }

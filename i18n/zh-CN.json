@@ -71,5 +71,13 @@
   "preview": "模拟数据",
   "normalKind": "普通",
   "eoKind": "EO",
-  "questKind": "任务"
+  "questKind": "任务",
+  "practice": "演习",
+  "openDetails": "查看明细",
+  "close": "关闭",
+  "previousPage": "上一页",
+  "nextPage": "下一页",
+  "page": "{{page}} / {{pages}}",
+  "recordRange": "第 {{start}}–{{end}} 笔，共 {{count}} 笔",
+  "recordCount": "{{count}} 笔记录"
 }

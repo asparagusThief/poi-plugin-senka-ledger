@@ -40,7 +40,7 @@ function apply(state, input) {
     const localGain = input.gain
     if (!old) {
       if (localGain !== null && localGain <= input.exp && localGain > 0) {
-        add(state, { source: 'local', kind: 'normal', amount: localGain * RATE, exp: localGain, at, label: input.label, mapId: input.mapId, node: input.node, rank: input.rank })
+        add(state, { source: 'local', kind: 'normal', amount: localGain * RATE, exp: localGain, at, label: input.label, activity: input.activity, mapId: input.mapId, node: input.node, rank: input.rank })
       }
       add(state, { source: 'baseline', kind: 'baseline', amount: 0, at, label: '首次观测：此前普通战果未收录' })
     } else {
@@ -54,7 +54,7 @@ function apply(state, input) {
       } else {
         const known = localGain || 0
         if (delta > known) unknown(state, input, (delta - known) * RATE, 'normal', old.at, '未在本地记录的经验增量（可能来自其他客户端）')
-        if (known > 0) add(state, { source: 'local', kind: 'normal', amount: known * RATE, exp: known, at, label: input.label, mapId: input.mapId, node: input.node, rank: input.rank })
+        if (known > 0) add(state, { source: 'local', kind: 'normal', amount: known * RATE, exp: known, at, label: input.label, activity: input.activity, mapId: input.mapId, node: input.node, rank: input.rank })
       }
     }
     state.baseline = { exp: input.exp, at }

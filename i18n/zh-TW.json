@@ -71,5 +71,13 @@
   "preview": "模擬資料",
   "normalKind": "一般",
   "eoKind": "EO",
-  "questKind": "任務"
+  "questKind": "任務",
+  "practice": "演習",
+  "openDetails": "查看明細",
+  "close": "關閉",
+  "previousPage": "上一頁",
+  "nextPage": "下一頁",
+  "page": "{{page}} / {{pages}}",
+  "recordRange": "第 {{start}}–{{end}} 筆，共 {{count}} 筆",
+  "recordCount": "{{count}} 筆記錄"
 }

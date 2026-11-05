@@ -71,5 +71,13 @@
   "preview": "サンプルデータ",
   "normalKind": "通常",
   "eoKind": "EO",
-  "questKind": "任務"
+  "questKind": "任務",
+  "practice": "演習",
+  "openDetails": "明細を開く",
+  "close": "閉じる",
+  "previousPage": "前のページ",
+  "nextPage": "次のページ",
+  "page": "{{page}} / {{pages}}",
+  "recordRange": "{{count}} 件中 {{start}}–{{end}} 件",
+  "recordCount": "{{count}} 件の記録"
 }

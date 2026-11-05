@@ -66,3 +66,11 @@ test('ranking adapter records minimal values and isolates account changes', () =
   assert.equal(adapter.ranking.rows.size, 0)
   assert.equal(adapter.nickname, 'Next')
 })
+test('501 is no longer an anchor, but an actual own rank of 501 remains visible', () => {
+  const first = readRanking(createRankingReader(), page(491, 20), at('2026-11-05T16:00:00'), 'Admiral', '123')
+  assert.ok(!first.entries.some(e => e.rank === 501))
+  const legacy = { v: 1, type: 'ranking', at: at('2026-11-05T16:00:00'), period: at('2026-11-05T15:00:00'), entries: [{ rank: 500, score: 3500, self: false }, { rank: 501, score: 3493, self: false }] }
+  assert.deepEqual(snapshot([legacy], '2026-11').rows.map(e => e.rank), [500])
+  legacy.entries[1].self = true
+  assert.deepEqual(snapshot([legacy], '2026-11').rows.map(e => e.rank), [500, 501])
+})

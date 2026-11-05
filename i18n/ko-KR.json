@@ -71,5 +71,13 @@
   "preview": "예시 데이터",
   "normalKind": "일반",
   "eoKind": "EO",
-  "questKind": "임무"
+  "questKind": "임무",
+  "practice": "연습전",
+  "openDetails": "상세 보기",
+  "close": "닫기",
+  "previousPage": "이전 페이지",
+  "nextPage": "다음 페이지",
+  "page": "{{page}} / {{pages}}",
+  "recordRange": "{{count}}건 중 {{start}}–{{end}}건",
+  "recordCount": "{{count}}건의 기록"
 }
