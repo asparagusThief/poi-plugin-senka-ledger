@@ -9,7 +9,7 @@ if ($destination -ne ($pluginParent.TrimEnd('\') + '\poi-plugin-senka-ledger')) 
 if (-not (Test-Path -LiteralPath $poiDirectory -PathType Container)) { throw "poi data directory does not exist: $poiDirectory" }
 if (Test-Path -LiteralPath $destination) { throw "Plugin already exists; nothing overwritten: $destination" }
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
-foreach ($name in @('package.json', 'index.js', 'src', 'i18n', 'README.md', 'LICENSE')) {
+foreach ($name in @('package.json', 'index.js', 'src', 'assets', 'i18n', 'README.md', 'README.zh-CN.md', 'README.zh-TW.md', 'README.ja-JP.md', 'README.ko-KR.md', 'LICENSE')) {
     Copy-Item -LiteralPath (Join-Path $sourceDirectory $name) -Destination $destination -Recurse
 }
 Write-Output "Installed: $destination"

@@ -1,72 +1,59 @@
-# 战果手账 · Senka Ledger
+# Senka Ledger
 
-面向 **poi 12.0.1** 的独立本地插件。按事件保存战果增量，可查看往月、每日和每小时的记录。界面目前使用简体中文。
+[English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-## 界面预览
+A local senka ledger for **poi 12.0.1** with daily history, hourly details and ranking snapshots. The original notebook icon is provided as SVG and registered in poi's icon library.
 
-下图均使用模拟数据。
+## Features
 
-![月度日历](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
+- A monthly calendar opens into daily and hourly views. Every tile shows its value; date, time and score are centered.
+- Normal senka comes from each battle's Admiral EXP, using `EXP × 7 / 10000`. EO and quest rewards appear only in the top summaries.
+- Unobserved EXP gains retain their possible interval and are excluded from login-day and login-hour activity. Unobserved EO and quest rewards are not inferred.
+- Ranking snapshots show your own score and positions **1, 5, 20, 100, 500 and 501**, when those pages have been observed. Ranking scores are separate from activity totals.
+- Independent scrolling works in poi's main panel and its **Open in window** portal. Narrow layouts wrap controls and summaries; wide tables and calendars can scroll horizontally without overlapping text.
+- Follows poi's language: English, Simplified Chinese, Traditional Chinese, Japanese or Korean. CSV headers, battle details and storage errors are localized as well.
+- Account-separated append-only journals, previous months, CSV export and complete JSON backup.
 
-![每日时段与明细](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
+## Preview
 
-## 统计方式
+The screenshots use synthetic data.
 
-- **本地确认**：出击结算的 `api_get_exp × 7 / 10000`，以及直接观测到的 EO、成功领取的常设季常战果任务奖励。
-- **未定位增量**：总提督经验增长超过本场奖励的部分，记录「上次观测 → 本次观测」区间。可能来自其他客户端、插件关闭或漏包；无法仅凭差额判定具体原因。
-- **不把发现时间当获得时间**：未定位记录只含经验产生的普通战果，不进入登录当天、登录小时或每日色块。本月内区间单列；跨月区间在相关月份显示区间总额，不分摊，也不能跨月相加。
-- **首次使用**：总经验只建立基准，不把账号终身经验折算为本月战果。如果首次观测就是出击结算，可以记录该场明确给出的奖励。
-- **EO**：直接响应中的 `api_get_exmap_rate` / `api_get_eo_rate` 按响应时刻记账，只在顶部汇总，不进入日历、小时色块或逐笔明细。不再根据地图完成状态推断未在本地记录的 EO，旧版日志中的此类记录也不展示。
-- **任务**：仅在 poi 的成功领取响应后记账，支持任务 ID `854, 888, 893, 872, 284, 845, 903`。按日本时间 3/6/9/12 月 1 日 05:00 重置去重周期。其他战果任务尚未支持；其他客户端领取的任务奖励无法从经验差恢复。
+![Monthly calendar](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
 
-例如：昨天 22:00 总经验为 100000，今天 01:00 本地出击后总经验为 110000，本场经验为 1000。今天 01 时的色块只增加 **0.70**；剩余 **6.30** 作为昨天 22:00 到今天 01:00 的未定位增量单列。
+![Daily and hourly details](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
 
-这里显示的是按自然日、自然月分组的**活动战果增量估算**，不是官方排名总战果。月末普通战果与 EO 截止、任务顺延、年内继承及官方排名四舍五入等规则不在此汇总中推算。月末截止后的本地活动仍保留，可回看其实际获得时间。
+## Install and use
 
-## 查看与导出
+Install **`poi-plugin-senka-ledger`** in poi's plugin manager, or install the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
 
-1. 启用插件后进入母港，等待实时账号数据建立基准。插件不会采用 poi 上一次运行缓存的账号或经验。
-2. 选择账号、月份和日本／中国时区。默认日本时间，原始日志统一保存 UTC 毫秒。
-3. 默认显示月度日历，每个日期色块直接显示当日普通战果；点击日期进入二级界面，查看 24 个小时的色块与数值。点击小时可筛选普通战果明细，「返回月览」回到日历。
-4. 月度和每日页面的顶部显示总战果、普通战果、EO 战果与任务战果。EO 和任务不出现在逐笔明细中；未在本地记录的增量只显示经验差额的区间、发现时间与数值。
-5. 「导出本月 CSV」顶部保留月度汇总，下方只有普通战果明细与涉及该月的经验未定位区间；「备份全部 JSON」包含该账号完整原始日志，与旧版数据兼容。
+Enable the plugin and visit the home port to establish a live EXP baseline. Select a month, click a date, then click an hour to filter the normal-senka details. EO and quest rewards remain in the summaries.
 
-历史从插件开始记录后积累，保留全部月份。游戏不提供往月逐场历史，因此无法自动恢复安装前的每场出击或其他客户端的准确刷取时刻。本地记录的时刻为 poi 接收到响应的时刻，系统时钟需要准确。
+For ranking data, **open the ranking list inside the game** and visit the relevant pages, including your own entry. Expand the ranking section in the plugin to inspect scores and read times. The plugin observes normal game responses; it does not send ranking requests or operate the game. Same-name entries are not treated as yours when identity is ambiguous. Old snapshots keep their read time. At the start of a month, ranking responses read before 03:00 JST remain associated with the previous month.
 
-## 安装
+The plugin ID now matches the package name, correcting poi's active-plugin heading. Window, pin and favorite preferences from the previous ID are migrated. The journal location is unchanged.
 
-无需编译或额外运行依赖，使用 poi 自带的 React。安装独立包，不会替换原战果计算插件，可同时运行。
+## Data and limits
 
-npm 包名：`poi-plugin-senka-ledger`。在 poi 的插件管理中按此包名安装。也可从 [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases) 下载本地插件包。
+Journals live at `APPDATA_PATH/senka-ledger/<accountID>.jsonl`, normally `%APPDATA%\poi\senka-ledger\` on Windows. Every accepted record is appended and flushed to disk. Tokens, passwords, complete responses and other players' names are not stored. One writer owns each data directory; damaged or incomplete records pause writing while preserving the original file.
 
-在本目录运行：
+History starts when recording starts. Earlier individual battles cannot be recovered from the game. Cross-month EXP gaps are shown as intervals, without assigning them to a particular month. Activity totals use natural calendar days/months in the selected time zone; they do not calculate ranking carryover, monthly deadlines or deferred quest rewards.
+
+Seven regular quarterly senka quests are supported: `854, 888, 893, 872, 284, 845, 903`. Other quests are not inferred. The ranking decoder follows the current observed obfuscated response format; invalid or insufficient data is not displayed as a new score. A game update may require decoder changes.
+
+Back up the data folder before replacing a damaged journal. To restore, close all poi instances and restore the original `<accountID>.jsonl` file. A JSON backup's `journal` field contains that exact text. There is no in-app import yet. Version 0.1.x journals remain readable.
+
+## Development
+
+Node.js 20+; no build step or extra runtime dependencies. React and the icon library come from poi.
 
 ```powershell
+npm run check
+npm test
+npm run pack:local
+# Optional source installation; refuses to overwrite an existing plugin.
 & .\scripts\install-local.ps1
 ```
 
-自定义 poi 数据目录可传 `-PoiDataDirectory '你的路径'`。安装脚本在目标已存在时停止，不覆盖任何现有插件。重启 poi，在插件设置中启用「战果手账 / Senka Ledger」，然后重新进入母港。
+The package is generated in `dist/`. `scripts/preview.js <React-18-UMD-directory> <output.html>` creates a synthetic browser preview; it never opens a real journal. It supports all five languages, a real React portal window and layout stress cases.
 
-也可使用 `dist/poi-plugin-senka-ledger-0.1.2.tgz` 通过 poi 的本地插件安装功能安装。在源码目录执行 `npm run pack:local` 后会生成此文件。
-
-## 数据与备份
-
-数据位于 poi 的 `APPDATA_PATH/senka-ledger/<账号ID>.jsonl`，Windows 通常是 `%APPDATA%\poi\senka-ledger\`。每个账号独立日志，逐笔追加并同步到磁盘；重启时重放日志，不按月份覆盖或清零。保存少量必要数值与标签，不保存 API token、完整响应、密码或游戏操作。
-
-停用、更新或卸载插件前建议备份整个 `senka-ledger` 数据文件夹。手动恢复时，关闭所有 poi 实例后将原始 `<账号ID>.jsonl` 放回数据目录。导出 JSON 的 `journal` 字段保存同一份原始日志文本，可原样恢复到相应账号文件；目前没有界面导入功能。
-
-同一数据目录只允许一个写入实例。异常退出留下的锁在确认进程不存在后自动恢复；若锁中的进程号已被其他进程复用，需要在关闭全部 poi 后手动移走 `.writer-lock`。日志存在损坏或未写完的末行时，只加载损坏前的有效数据并暂停该账号写入，保留文件供恢复，界面显示异常。
-
-## 开发验证
-
-需要 Node.js 20 或更新版本：
-
-```powershell
-npm.cmd run check
-npm.cmd test
-npm.cmd run pack:local
-```
-
-测试覆盖跨日、跨月、跨年、重连、首次基准、联合舰队、未知增量、本场奖励缺失、重复响应、EO 对账、任务周期、时区分组、多账号、重启恢复与日志损坏。提供模拟数据预览生成器 `scripts/preview.js`；预览数据不写入真实账号文件。
-
-参考核对：[poi 12.0.1](https://github.com/poooi/poi/releases/tag/v12.0.1)、[现有战果计算插件](https://www.npmjs.com/package/poi-plugin-senka-calc)（5.6.2）。本插件为独立实现，未修改或覆盖现有插件。
+References: [poi](https://github.com/poooi/poi), [Ranking Calc](https://www.npmjs.com/package/poi-plugin-senka-calc). This is an independent implementation and icon design. MIT license.

@@ -3,6 +3,7 @@
 const { parts, monthBounds } = require('./time')
 function months(state, zone) {
   const result = new Set()
+  for (const record of state.rankingHistory || []) result.add(parts(record.period).month)
   for (const e of state.events) {
     if (e.source === 'unknown' && e.kind !== 'normal') continue
     result.add(parts(e.at, zone).month)

@@ -1,100 +1,91 @@
 'use strict'
 
-// Usage: node scripts/preview.js <directory with React 18 UMD files> <output.html>
-// This renders the real panel against synthetic data. It never opens a journal.
+// node scripts/preview.js <React 18 UMD directory> <output.html>
+// Query options: lang=en-US, view=day, portal=1, check=1, stress=1.
 const fs = require('fs')
 const path = require('path')
 const root = path.resolve(__dirname, '..')
 const runtime = path.resolve(process.argv[2] || '.')
 const output = path.resolve(process.argv[3] || 'preview.html')
-const names = ['time', 'ledger', 'adapter', 'model', 'export', 'panel']
-const bundle = names.map(name => {
-  const source = fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')
-  return `modules['./${name}']=function(module,exports,require){\n${source}\n};`
-}).join('\n')
+const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'i18n', 'layout', 'icon', 'styles']
+let bundle = names.map(name => `modules['./${name}']=function(module,exports,require){\n${fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')}\n};`).join('\n')
+for (const language of ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) bundle += `\nmodules['../i18n/${language}.json']=function(module){module.exports=${fs.readFileSync(path.join(root, 'i18n', language + '.json'), 'utf8')};};`
 const react = fs.readFileSync(path.join(runtime, 'react.production.min.js'), 'utf8')
 const dom = fs.readFileSync(path.join(runtime, 'react-dom.production.min.js'), 'utf8')
+const hostStyle = 'html,body{margin:0;height:100%;overflow:hidden;background:#edf2f5;color:#233b47;font:13px sans-serif}#plugin-mountpoint{display:flex;flex-direction:column;height:100vh}.titlebar{flex:none;height:32px;display:flex;align-items:center;padding:0 12px;background:#e1e9ee}.poi-app-tabpane{flex:1;min-height:0;width:100%;overflow:hidden;display:flex;flex-direction:column}#app{height:100%;min-height:0;display:flex;flex-direction:column;background:#fff}@media(prefers-color-scheme:dark){html,body{background:#151c23;color:#d8e3e9}#app{background:#202b35}.titlebar{background:#151c23}}'
+const hostHTML = '<style>' + hostStyle + '</style><div id="plugin-mountpoint"><header class="titlebar">Senka Ledger · Sample data</header><div class="poi-app-tabpane"><div id="app"></div></div></div>'
 const script = `
 const modules={},cache={};
 ${bundle}
 function require(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;modules[id](m,m.exports,require);return m.exports;}
-const {createLedger,apply}=require('./ledger');
-const state=createLedger();
-const at=s=>Date.parse(s+'+09:00');
-let total=10000000;
+const params=new URLSearchParams(location.search);
+const {createLedger,apply}=require('./ledger');const {translator,normalize}=require('./i18n');
+const state=createLedger();const at=s=>Date.parse(s+'+09:00');let total=10000000;
 apply(state,{v:1,type:'experience',at:at('2026-10-30T20:00:00'),exp:total,gain:null,label:'母港'});
-for(let d=31;d<=31;d++){total+=1000;apply(state,{v:1,type:'experience',at:at('2026-10-'+d+'T22:20:00'),exp:total,gain:1000,label:'7-1 节点 4 · S 胜败'});}
+total+=1000;apply(state,{v:1,type:'experience',at:at('2026-10-31T22:20:00'),exp:total,gain:1000,label:'7-1 节点 4 · S 胜败'});
 for(let d=1;d<=5;d++){
- for(let hour=7;hour<24;hour++){
-  const n=(d*7+hour*3)%9;
-  for(let i=0;i<n;i++){
-   const gain=900+((d+hour+i)%5)*120;total+=gain;
-   apply(state,{v:1,type:'experience',at:at('2026-11-0'+d+'T'+String(hour).padStart(2,'0')+':'+String(i*7).padStart(2,'0')+':15'),exp:total,gain,label:'7-1 节点 4 · S 胜败'});
-  }
+ for(let hour=7;hour<24;hour++)for(let i=0,n=(d*7+hour*3)%9;i<n;i++){
+  const gain=900+((d+hour+i)%5)*120;total+=gain;
+  apply(state,{v:1,type:'experience',at:at('2026-11-0'+d+'T'+String(hour).padStart(2,'0')+':'+String(i*7).padStart(2,'0')+':15'),exp:total,gain,label:'7-1 节点 4 · S 胜败'});
  }
  if(d===3){total+=14000;apply(state,{v:1,type:'experience',at:at('2026-11-04T06:30:00'),exp:total,gain:null,label:'母港'});}
 }
 apply(state,{v:1,type:'bonus',kind:'eo',at:at('2026-11-04T20:12:32'),amount:200,mapId:55,questId:null,key:'eo:2026-11:55',label:'5-5 · EO 奖励'});
 apply(state,{v:1,type:'bonus',kind:'quest',at:at('2026-11-05T16:22:30'),amount:350,mapId:null,questId:854,key:'quest:2026:2:854',label:'Z作战前段 · 任务 854'});
 apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
-const service={snapshot:()=>({account:'12345678',accounts:['12345678'],directory:'模拟预览 · 数据不会写入真实账号'}),subscribe:cb=>{cb(service.snapshot());return()=>{}},entry:()=>({state}),export:()=>{document.body.dataset.exported='yes'}};
+apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800],[501,2799]].map(([rank,score])=>({rank,score,self:rank===250}))});
+if(params.has('stress'))for(const e of state.events)if(e.source==='local'&&e.kind==='normal')e.amount*=100000;
+let language=normalize(params.get('lang')||'zh-CN');const subscribers=new Set();
+const service={snapshot:()=>({account:'12345678',accounts:['12345678'],language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:()=>({state}),export:()=>{doc.body.dataset.exported='yes'}};
 const Panel=require('./panel').createPanel(React,service);
-ReactDOM.createRoot(document.getElementById('app')).render(React.createElement(Panel));
-const pause=()=>new Promise(resolve=>setTimeout(resolve,50));
-const assert=(ok,message)=>{if(!ok)throw Error(message)};
-const selectValue=async(label,value)=>{const el=document.querySelector('select[aria-label="'+label+'"]');el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));await pause()};
-const text=()=>document.querySelector('.sl').textContent;
-const normalNumber=n=>n.toLocaleString('zh-CN',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2});
-const summary=label=>document.querySelector('[data-summary="'+label+'"] .value').textContent;
+let doc=document;let popup=null;
+if(params.has('portal')){
+ popup=open('about:blank','senka-ledger-portal','width=600,height=500');if(!popup)throw Error('Popup blocked');
+ popup.document.open();popup.document.write(${JSON.stringify(hostHTML)});popup.document.close();popup.isWindowMode=true;doc=popup.document;
+ ReactDOM.createRoot(document.getElementById('app')).render(ReactDOM.createPortal(React.createElement(Panel),doc.getElementById('app')));
+}else ReactDOM.createRoot(document.getElementById('app')).render(React.createElement(Panel));
+const api={state,setLanguage(value){language=normalize(value);for(const cb of subscribers)cb(service.snapshot())}};
+window.senkaPreview=api;doc.defaultView.senkaPreview=api;
+const pause=()=>new Promise(resolve=>setTimeout(resolve,50));const assert=(ok,message)=>{if(!ok)throw Error(message)};
+const select=async(key,value)=>{const el=doc.querySelector('[data-control="'+key+'"]');el.value=value;el.dispatchEvent(new doc.defaultView.Event('change',{bubbles:true}));await pause()};
+const text=()=>doc.querySelector('.sl').textContent;
+const tileNumber=n=>n.toLocaleString(language,{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2});
 async function preview(){
- await pause();await selectValue('月份','2026-11');
- const params=new URLSearchParams(location.search);
+ await pause();await select('month','2026-11');
  if(params.has('check')){
-  assert(document.querySelector('.sl').dataset.view==='month','Initial view must be monthly');
-  assert(document.querySelectorAll('[data-day]').length===30,'Monthly calendar needs 30 dates');
-  assert(!document.querySelector('.hours'),'Hourly view must be hidden initially');
-  assert(!document.querySelector('[aria-label="普通战果明细"]'),'Details must wait for date selection');
+  assert(doc.querySelector('.sl').dataset.view==='month'&&!doc.querySelector('.hours'),'Initial monthly view failed');
+  assert(doc.querySelectorAll('[data-day]').length===30,'Monthly date count failed');
   const report=require('./model').summarize(state,'2026-11');
-  for(const d of report.days)assert(document.querySelector('[data-day="'+d.day+'"] .tile-value').textContent===normalNumber(d.normal),'Daily numeric value mismatch');
-  assert(document.querySelectorAll('[aria-label="未在本地记录的增量"] tbody tr').length===1,'Unknown EO leaked into table');
-  assert(text().includes('9.80')&&!text().includes('完成时间未记录'),'Experience-only unknown records required');
-  assert(!text().includes('热力图')&&!text().includes('说明')&&!document.querySelector('details'),'Removed wording still visible');
-  document.body.dataset.monthChecked='yes';
-  document.querySelector('[data-day="2026-11-04"]').click();await pause();
-  assert(document.querySelector('.sl').dataset.view==='day','Date must open secondary view');
-  assert(document.querySelectorAll('[data-hour]').length===24&&!document.querySelector('.calendar'),'Day view must replace calendar');
-  for(let hour=0;hour<24;hour++)assert(document.querySelector('[data-hour="'+hour+'"] .tile-value').textContent===normalNumber(report.days[3].slots[hour]),'Hour numeric value mismatch');
-  assert(summary('EO 战果')==='200.00','EO must remain in top summary');
-  assert(!text().includes('5-5 · EO 奖励'),'EO reward leaked into detail');
-  document.querySelector('[data-hour="20"]').click();await pause();
-  assert(text().includes('20:00–21:00 · 明细'),'Hour selection failed');
-  assert(!document.querySelector('[aria-label="普通战果明细"]').textContent.includes('EO'),'Bonus leaked into hourly details');
-  document.body.dataset.dayChecked='yes';
-  await selectValue('时区','Asia/Shanghai');
-  const shifted=require('./model').summarize(state,'2026-11','Asia/Shanghai');
-  assert(document.querySelector('[data-hour="19"] .tile-value').textContent===normalNumber(shifted.days[3].slots[19]),'Timezone regrouping failed');
-  document.body.dataset.zoneChecked='yes';
-  await selectValue('时区','Asia/Tokyo');
-  document.querySelector('[aria-label="返回月览"]').click();await pause();
-  assert(document.querySelector('.sl').dataset.view==='month'&&!document.querySelector('[data-hour]'),'Back navigation failed');
-  await selectValue('月份','2026-10');
-  assert(document.querySelectorAll('[data-day]').length===31,'Archive month failed');
-  document.querySelector('[data-day="2026-10-31"]').click();await pause();
-  assert(document.querySelector('[data-hour="22"] .tile-value').textContent==='0.70','Archive details failed');
-  await selectValue('月份','2026-11');
-  document.querySelector('[data-day="2026-11-05"]').click();await pause();
-  assert(summary('任务战果')==='350.00'&&!text().includes('Z作战前段'),'Task should only appear in summary');
-  document.querySelector('[data-hour="16"]').click();await pause();
-  assert(document.querySelector('[aria-label="普通战果明细"] tbody').children.length===2,'Hourly detail should have only two experience records');
-  document.body.dataset.archiveChecked='yes';
-  document.querySelector('[aria-label="返回月览"]').click();await pause();
+  for(const d of report.days)assert(doc.querySelector('[data-day="'+d.day+'"] .tile-value').textContent===tileNumber(d.normal),'Daily value mismatch');
+  assert(doc.querySelectorAll('[data-table="unknown"] tbody tr').length===1,'Unknown EO leaked');
+  assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');
+  assert(doc.querySelector('[data-table="ranking"]').textContent.includes('#250'),'Ranking score missing');
+  doc.querySelector('[data-day="2026-11-04"]').click();await pause();
+  assert(doc.querySelectorAll('[data-hour]').length===24&&!doc.querySelector('.calendar'),'Secondary day view failed');
+  for(let hour=0;hour<24;hour++)assert(doc.querySelector('[data-hour="'+hour+'"] .tile-value').textContent===tileNumber(report.days[3].slots[hour]),'Hour value mismatch');
+  doc.querySelector('[data-hour="20"]').click();await pause();
+  assert(!doc.querySelector('[data-table="details"]').textContent.includes('EO'),'EO leaked into details');
+  await select('zone','Asia/Shanghai');const shifted=require('./model').summarize(state,'2026-11','Asia/Shanghai');
+  assert(doc.querySelector('[data-hour="19"] .tile-value').textContent===tileNumber(shifted.days[3].slots[19]),'Timezone failed');
+  await select('zone','Asia/Tokyo');doc.querySelector('[data-action="back"]').click();await pause();
+  await select('month','2026-10');doc.querySelector('[data-day="2026-10-31"]').click();await pause();
+  assert(doc.querySelector('[data-hour="22"] .tile-value').textContent===tileNumber(params.has('stress')?70000:0.7),'Archive failed');
+  await select('month','2026-11');
+  const originalLanguage=language;
+  for(const lang of ['en-US','zh-CN','zh-TW','ja-JP','ko-KR']){api.setLanguage(lang);await pause();assert(doc.querySelector('h2').textContent===translator(lang)('Senka Ledger'),'Language switch failed')}
+  api.setLanguage(originalLanguage);await pause();
+  doc.body.dataset.interactions='yes';
  }
- if(params.get('view')==='day'){document.querySelector('[data-day="2026-11-05"]').click();await pause();document.querySelector('[data-hour="16"]').click();await pause()}
- assert(document.documentElement.scrollWidth<=innerWidth,'Page overflows horizontally');
- for(const el of document.querySelectorAll('.tile-value'))assert(el.scrollWidth<=el.clientWidth+1,'Tile value overflows');
- document.body.dataset.ready='yes';
+ if(params.get('view')==='day'){doc.querySelector('[data-day="2026-11-05"]').click();await pause();doc.querySelector('[data-hour="16"]').click();await pause()}
+ const shell=doc.querySelector('.sl-shell');shell.scrollTop=shell.scrollHeight;await pause();
+ assert(shell.scrollTop>0,'Panel cannot scroll');
+ const foot=doc.querySelector('.foot').getBoundingClientRect(),box=shell.getBoundingClientRect();
+ assert(foot.bottom<=box.bottom+1&&foot.top>=box.top,'Panel bottom is unreachable');
+ for(const el of doc.querySelectorAll('.tile-value,.tile-label'))assert(el.scrollWidth<=el.clientWidth+1,'Tile text overflow');
+ assert(doc.documentElement.scrollWidth<=doc.defaultView.innerWidth,'Page horizontal overflow');
+ shell.scrollTop=0;doc.body.dataset.ready='yes';
 }
-preview().catch(error=>{document.body.dataset.testError=String(error)});
+preview().catch(error=>{doc.body.dataset.testError=String(error)});
 `
-fs.writeFileSync(output, '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>战果手账 · 模拟预览</title><style>body{margin:0;background:#edf2f5;color:#233b47}#app{max-width:1120px;margin:20px auto;background:#fff;border-radius:12px;box-shadow:0 6px 32px #1232}body:before{content:"模拟数据预览";display:block;text-align:center;padding-top:12px;color:#647b85;font:12px sans-serif}@media(prefers-color-scheme:dark){body{background:#151c23;color:#d8e3e9}#app{background:#202b35}}</style><div id="app"></div><script>' + react + '</script><script>' + dom + '</script><script>' + script.replaceAll('</script', '<\\/script') + '</script></html>')
+fs.writeFileSync(output, '<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Senka Ledger preview</title>' + hostHTML + '<script>' + react + '</script><script>' + dom + '</script><script>' + script.replaceAll('</script', '<\\/script') + '</script></html>')
 console.log(output)

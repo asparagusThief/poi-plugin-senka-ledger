@@ -2,6 +2,7 @@
 
 const { EO, QUESTS } = require('./ledger')
 const { parts } = require('./time')
+const { RANKING_PATH, createRankingReader, readRanking } = require('./ranking')
 const number = value => {
   if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null
   const n = Number(value)
@@ -9,7 +10,7 @@ const number = value => {
 }
 const BATTLES = new Set(['/kcsapi/api_req_sortie/battleresult', '/kcsapi/api_req_combined_battle/battleresult'])
 function createAdapter() {
-  return { account: null, mapId: null, node: null }
+  return { account: null, nickname: '', mapId: null, node: null, ranking: createRankingReader() }
 }
 // Read only documented, relevant fields. Tokens and complete API bodies never enter the journal.
 function decode(adapter, detail) {
@@ -19,17 +20,24 @@ function decode(adapter, detail) {
     path === '/kcsapi/api_get_member/basic' ? body : null
   if (basic && /^\d+$/.test(String(basic.api_member_id))) {
     const account = String(basic.api_member_id)
-    if (adapter.account !== account) { adapter.mapId = null; adapter.node = null }
+    if (adapter.account !== account) { adapter.mapId = null; adapter.node = null; adapter.ranking = createRankingReader(); adapter.nickname = '' }
     adapter.account = account
+    if (typeof basic.api_nickname === 'string') adapter.nickname = basic.api_nickname
   }
   if (path === '/kcsapi/api_start2/getData') {
     adapter.account = null
     adapter.mapId = null
     adapter.node = null
+    adapter.nickname = ''
+    adapter.ranking = createRankingReader()
   }
   if (!adapter.account) return null
   const records = []
   const push = data => records.push({ v: 1, at, ...data })
+  if (path === RANKING_PATH) {
+    const ranking = readRanking(adapter.ranking, body, at, adapter.nickname, adapter.account)
+    if (ranking) records.push(ranking)
+  }
   let exp = null
   if (basic) exp = number(basic.api_experience)
   else if (path === '/kcsapi/api_get_member/record') exp = number(body.api_experience?.[0])
@@ -44,6 +52,7 @@ function decode(adapter, detail) {
   const mapLabel = adapter.mapId === null ? '海域未知' : `${Math.floor(adapter.mapId / 10)}-${adapter.mapId % 10}`
   if (exp !== null) push({ type: 'experience', exp,
     gain: BATTLES.has(path) ? number(body.api_get_exp) : null,
+    ...(BATTLES.has(path) ? { mapId: adapter.mapId, node: adapter.node, rank: String(body.api_win_rank || '?') } : {}),
     label: BATTLES.has(path) ? `${mapLabel}${adapter.node === null ? '' : ` 节点 ${adapter.node}`} · ${body.api_win_rank || '?'} 胜败` : '总经验观测' })
   const eoAmount = number(body.api_get_exmap_rate) || number(body.api_get_eo_rate)
   if (eoAmount && (BATTLES.has(path) || path === '/kcsapi/api_req_map/next' || path === '/kcsapi/api_req_map/start')) {

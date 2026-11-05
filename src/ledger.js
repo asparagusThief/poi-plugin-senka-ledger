@@ -15,11 +15,12 @@ function validInput(input) {
     case 'bonus': return ['eo', 'quest'].includes(input.kind) && integer(input.amount) && input.amount > 0 && typeof input.key === 'string' && typeof input.label === 'string' &&
       (input.mapId === null || integer(input.mapId)) && (input.questId === null || integer(input.questId))
     case 'maps': return Array.isArray(input.cleared) && input.cleared.every(n => integer(n) && Object.hasOwn(EO, n))
+    case 'ranking': return integer(input.period) && input.period <= input.at && Array.isArray(input.entries) && input.entries.length <= 8 && input.entries.every(e => integer(e.rank) && e.rank > 0 && integer(e.score) && typeof e.self === 'boolean')
     default: return false
   }
 }
 function createLedger() {
-  return { events: [], baseline: null, eoMonths: {}, unlocatedEO: {}, ambiguousEO: {}, bonusKeys: new Set(), sequence: 0 }
+  return { events: [], rankingHistory: [], baseline: null, eoMonths: {}, unlocatedEO: {}, ambiguousEO: {}, bonusKeys: new Set(), sequence: 0 }
 }
 function add(state, event) {
   state.events.push({ id: ++state.sequence, ...event })
@@ -30,14 +31,16 @@ function unknown(state, input, amount, kind, from, label) {
 function apply(state, input) {
   if (!validInput(input)) throw new Error('Invalid ledger record')
   const { at } = input
-  if (input.type === 'experience') {
+  if (input.type === 'ranking') {
+    state.rankingHistory.push(input)
+  } else if (input.type === 'experience') {
     const old = state.baseline
     // Ignore stale observations: they must never move the cumulative baseline backwards.
     if (old && at < old.at) return
     const localGain = input.gain
     if (!old) {
       if (localGain !== null && localGain <= input.exp && localGain > 0) {
-        add(state, { source: 'local', kind: 'normal', amount: localGain * RATE, exp: localGain, at, label: input.label })
+        add(state, { source: 'local', kind: 'normal', amount: localGain * RATE, exp: localGain, at, label: input.label, mapId: input.mapId, node: input.node, rank: input.rank })
       }
       add(state, { source: 'baseline', kind: 'baseline', amount: 0, at, label: '首次观测：此前普通战果未收录' })
     } else {
@@ -51,7 +54,7 @@ function apply(state, input) {
       } else {
         const known = localGain || 0
         if (delta > known) unknown(state, input, (delta - known) * RATE, 'normal', old.at, '未在本地记录的经验增量（可能来自其他客户端）')
-        if (known > 0) add(state, { source: 'local', kind: 'normal', amount: known * RATE, exp: known, at, label: input.label })
+        if (known > 0) add(state, { source: 'local', kind: 'normal', amount: known * RATE, exp: known, at, label: input.label, mapId: input.mapId, node: input.node, rank: input.rank })
       }
     }
     state.baseline = { exp: input.exp, at }

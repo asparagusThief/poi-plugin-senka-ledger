@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 const os = require('os')
+const { EventEmitter } = require('events')
 const { createRequire } = require('module')
 const { Journal } = require('../src/storage')
 const { summarize } = require('../src/model')
@@ -45,4 +46,44 @@ test('records before opening panel, unloads cleanly and resumes after restart', 
   assert.equal(report.total, 0.7)
   assert.equal(report.unknownWithinMonth, 7)
   assert.equal(report.days[4].slots[1], 0.7)
+})
+test('poi integration registers original icon, follows language changes and migrates old window preferences', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const listeners = new Map()
+  const i18n = new EventEmitter()
+  i18n.language = 'zh-CN'
+  const bundles = new Map()
+  i18n.addResourceBundle = (language, namespace, data) => bundles.set(language + ':' + namespace, data)
+  const values = new Map([['poi.plugin.windowmode.senka-ledger', true], ['plugin.senka-ledger', { bounds: { width: 600, height: 500 } }]])
+  const config = { get: key => values.get(key), set: (key, value) => values.set(key, value) }
+  let icon = null
+  let panelService = null
+  const localRequire = createRequire(filename)
+  const context = { exports: {}, window: {
+    addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name)
+  }, require(name) {
+    if (name === 'react') return {}
+    if (name === '@fortawesome/fontawesome-svg-core') return { library: { add: definition => { icon = definition } } }
+    if (name === 'views/env') return { APPDATA_PATH: directory, isMain: true, config }
+    if (name === 'views/env-parts/i18next') return { default: i18n }
+    if (name === './src/panel') return { createPanel: (_, service) => { panelService = service; return function Panel() {} } }
+    return localRequire(name)
+  } }
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context, { filename })
+  assert.equal(icon.iconName, 'senka-ledger')
+  assert.equal(bundles.get('zh-CN:poi-plugin-senka-ledger')['Senka Ledger'], '战果手账')
+  const changes = []
+  const unsubscribe = panelService.subscribe(state => changes.push(state))
+  assert.equal(changes.at(-1).language, 'zh-CN')
+  assert.equal(values.get('poi.plugin.windowmode.poi-plugin-senka-ledger'), true)
+  assert.deepEqual(values.get('plugin.poi-plugin-senka-ledger'), { bounds: { width: 600, height: 500 } })
+  i18n.language = 'en-US'; i18n.emit('languageChanged', 'en-US')
+  assert.equal(changes.at(-1).language, 'en-US')
+  unsubscribe(); context.exports.pluginWillUnload()
+  assert.equal(i18n.listenerCount('languageChanged'), 0)
+  assert.equal(listeners.size, 0)
+  t.after(() => {
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
 })
