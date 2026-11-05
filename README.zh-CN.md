@@ -63,7 +63,7 @@ npm 包名：`poi-plugin-senka-ledger`。在 poi 的插件管理中按此包名�
 
 自定义 poi 数据目录可传 `-PoiDataDirectory '你的路径'`。安装脚本在目标已存在时停止，不覆盖任何现有插件。重启 poi，在插件设置中启用「战果手账 / Senka Ledger」，然后重新进入母港。
 
-也可使用 `dist/poi-plugin-senka-ledger-0.2.2.tgz` 通过 poi 的本地插件安装功能安装。在源码目录执行 `npm run pack:local` 后会生成此文件。
+也可使用 `dist/poi-plugin-senka-ledger-0.2.3.tgz` 通过 poi 的本地插件安装功能安装。在源码目录执行 `npm run pack:local` 后会生成此文件。
 
 ## 数据与备份
 

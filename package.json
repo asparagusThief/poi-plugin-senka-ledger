@@ -1,6 +1,6 @@
 {
   "name": "poi-plugin-senka-ledger",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A local senka ledger for poi with daily history, hourly details and ranking snapshots.",
   "main": "index.js",
   "license": "MIT",
