@@ -1,0 +1,36 @@
+{
+  "name": "poi-plugin-senka-ledger",
+  "version": "0.1.2",
+  "description": "按事件记录战果，保留往月明细并分离来源不明的增量",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "asparagusThief",
+  "homepage": "https://github.com/asparagusThief/poi-plugin-senka-ledger#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asparagusThief/poi-plugin-senka-ledger.git"
+  },
+  "bugs": {
+    "url": "https://github.com/asparagusThief/poi-plugin-senka-ledger/issues"
+  },
+  "keywords": ["poi", "poi-plugin", "kancolle", "senka", "战果"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": ["index.js", "src", "i18n", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/check.js",
+    "pack:local": "node scripts/pack.js"
+  },
+  "poiPlugin": {
+    "name": "Senka Ledger",
+    "id": "senka-ledger",
+    "description": "Daily and hourly records with separate bonus totals",
+    "i18nDir": "i18n",
+    "icon": "fa/line-chart",
+    "earliestCompatibleMain": "12.0.1",
+    "priority": 98
+  }
+}

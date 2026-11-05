@@ -1,0 +1,8 @@
+node_modules/
+.npm-cache/
+dist/
+*.tgz
+preview.html
+.npmrc
+.env
+.env.*
