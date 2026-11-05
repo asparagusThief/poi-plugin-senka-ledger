@@ -32,6 +32,7 @@ function errorText(error, t) {
   return message
 }
 function battleText(event, t) {
+  if (event.activity === 'expedition') return t('expedition')
   if (event.activity === 'practice') return t('practice') + (event.rank ? ' · ' + event.rank : '')
   const legacy = event.label?.match(/^(\d+-\d+|海域未知)(?: 节点 (\d+))? · ([A-Z?]+) 胜败$/)
   const map = event.mapId != null ? `${Math.floor(event.mapId / 10)}-${event.mapId % 10}` : legacy?.[1] !== '海域未知' && legacy?.[1] || t('unknownMap')

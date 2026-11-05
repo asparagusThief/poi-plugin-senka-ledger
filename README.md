@@ -2,65 +2,53 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-A local senka ledger for **poi 12.0.1** with daily history, hourly details and ranking snapshots. The original notebook icon is provided as SVG and registered in poi's icon library.
+A local senka ledger for **poi 12.0.1+**.
 
 ## Features
 
-- A compact monthly calendar opens into daily and hourly views. Tiles stay on the left at every panel size, with rankings above them and filters and summaries on the right. Narrow calendars scroll within the left column. Date and time labels share one size; the smaller score values share another and stay centered.
-- Normal senka comes from each sortie or practice result's explicit Admiral EXP reward, using `EXP × 7 / 10000`. EO and quest rewards appear only in the summaries.
-- Details open in a separate modal dialog with its own scrolling and **50 records per page**, instead of filling the daily view with a long table. Click an hour for that hour's details, or use **View details** for the full day. Unrecorded gains also open in a dialog.
-- Unobserved EXP gains retain their possible interval and show a visible total before opening their detail dialog. The total sums complete intervals in the current list, without allocating them to a particular day or month. They are excluded from login-day and login-hour activity. Unobserved EO and quest rewards are not inferred.
-- Ranking snapshots show your own score and positions **1, 5, 20, 100 and 500**, when those pages have been observed, plus each score's change since the preceding **03:00 or 15:00 JST** refresh. Ranking scores are separate from activity totals.
-- Independent scrolling works in poi's main panel and its **Open in window** portal. Narrow layouts wrap controls and summaries; wide tables and calendars can scroll horizontally without overlapping text.
-- Follows poi's language: English, Simplified Chinese, Traditional Chinese, Japanese or Korean. CSV headers, battle details and storage errors are localized as well.
-- Account-separated append-only journals, previous months, CSV export and complete JSON backup.
+- Monthly history with daily and hourly senka values; click a date or hour to view details.
+- Local sortie, practice and expedition rewards, calculated as `Admiral EXP × 7 / 10000`. EO and supported quest rewards appear in the summaries.
+- Unrecorded EXP gains shown separately with a total and possible time intervals, without assigning them to the login day or hour.
+- Ranking snapshots for yourself and positions **1, 5, 20, 100 and 500**, including gaps and changes since the preceding refresh.
+- Paginated details, CSV export, JSON backup and separate journals for each account.
+- English, Simplified Chinese, Traditional Chinese, Japanese and Korean; works in the main panel and separate windows.
+
+## Use
+
+1. Install `poi-plugin-senka-ledger` through poi's plugin manager or download the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
+2. Enable the plugin and enter the home port to establish the EXP baseline.
+3. Select an account, month and time zone. Click a date for hourly values, then an hour for details.
+
+Open the ranking list in the game and visit the relevant pages to record ranking scores. Changes compare the immediately preceding **03:00 / 15:00 JST** refresh; missing prior records show `—`. The plugin does not make game requests.
+
+## Data
+
+History starts when recording begins. Local rewards use their observed result time. Unrecorded gains retain their complete possible intervals; overlapping daily or monthly interval totals must not be added together. Activity totals do not include ranking carryover or official month-end adjustments.
+
+Supported senka quests: `854, 888, 893, 872, 284, 845, 903`.
+
+Journals are stored in `APPDATA_PATH/senka-ledger/<accountID>.jsonl`. Back up this folder before restoring data. Close all poi instances before replacing a journal. JSON backups contain the original journal text in `journal`; there is no in-app import. Tokens, passwords and complete API responses are not stored.
 
 ## Preview
 
-The screenshots use synthetic data.
+Screenshots use sample data.
 
-![Monthly calendar](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
+![Monthly view](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
 
-![Daily and hourly details](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
+![Hourly view](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
 
-![Paginated detail dialog](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/details.png)
-
-## Install and use
-
-Install **`poi-plugin-senka-ledger`** in poi's plugin manager, or install the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
-
-Enable the plugin and visit the home port to establish a live EXP baseline. Select a month, click a date, then click an hour to open the normal-senka detail dialog. EO and quest rewards remain in the summaries.
-
-Practice rewards are identified as local activity when their explicit reward is present. Any extra cumulative EXP outside that reward remains unlocated. This fix applies to newly observed results; older unlocated records without a stored source cannot be safely reclassified.
-
-For ranking data, **open the ranking list inside the game** and visit the relevant pages, including your own entry. Expand the ranking section in the plugin to inspect scores and read times. The plugin observes normal game responses; it does not send ranking requests or operate the game. Same-name entries are not treated as yours when identity is ambiguous. Old snapshots keep their read time. At the start of a month, ranking responses read before 03:00 JST remain associated with the previous month.
-
-Refresh changes compare the exact preceding 12-hour ranking period, following your own entry even when your rank changes. Re-reading a page within one period does not replace that baseline. If the preceding period or entry was not recorded, the change shows `—`. Comparisons across a monthly reset can be negative.
-
-The plugin ID now matches the package name, correcting poi's active-plugin heading. Window, pin and favorite preferences from the previous ID are migrated. The journal location is unchanged.
-
-## Data and limits
-
-Journals live at `APPDATA_PATH/senka-ledger/<accountID>.jsonl`, normally `%APPDATA%\poi\senka-ledger\` on Windows. Every accepted record is appended and flushed to disk. Tokens, passwords, complete responses and other players' names are not stored. One writer owns each data directory; damaged or incomplete records pause writing while preserving the original file.
-
-History starts when recording starts. Earlier individual battles cannot be recovered from the game. Cross-month EXP gaps are shown as intervals, without assigning them to a particular month. Activity totals use natural calendar days/months in the selected time zone; they do not calculate ranking carryover, monthly deadlines or deferred quest rewards.
-
-Seven regular quarterly senka quests are supported: `854, 888, 893, 872, 284, 845, 903`. Other quests are not inferred. The ranking decoder follows the current observed obfuscated response format; invalid or insufficient data is not displayed as a new score. A game update may require decoder changes.
-
-Back up the data folder before replacing a damaged journal. To restore, close all poi instances and restore the original `<accountID>.jsonl` file. A JSON backup's `journal` field contains that exact text. There is no in-app import yet. Version 0.1.x journals remain readable.
+![Detail dialog](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/details.png)
 
 ## Development
 
-Node.js 20+; no build step or extra runtime dependencies. React and the icon library come from poi.
+Node.js 20+. Runtime libraries are provided by poi.
 
-```powershell
+```text
 npm run check
 npm test
 npm run pack:local
-# Optional source installation; refuses to overwrite an existing plugin.
-& .\scripts\install-local.ps1
 ```
 
-The package is generated in `dist/`. `scripts/preview.js <React-18-UMD-directory> <output.html>` creates a synthetic browser preview; it never opens a real journal. It supports all five languages, a real React portal window and layout stress cases.
+Packages are generated in `dist/`. `scripts/install-local.ps1` installs from source without overwriting an existing plugin.
 
-References: [poi](https://github.com/poooi/poi), [Ranking Calc](https://www.npmjs.com/package/poi-plugin-senka-calc). This is an independent implementation and icon design. MIT license.
+MIT license.

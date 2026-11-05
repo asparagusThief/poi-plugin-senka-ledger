@@ -36,6 +36,7 @@ apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T03:30:00'),period:at('2026-11-05T03:00:00'),entries:[[1,8800],[5,8300],[20,7000],[100,4500],[300,3000],[500,2700]].map(([rank,score])=>({rank,score,self:rank===300}))});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800]].map(([rank,score])=>({rank,score,self:rank===250}))});
 state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:10:00'),amount:0.14,exp:200,activity:'practice',mapId:null,node:null,rank:'S',label:'演习 · S'});
+state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:59:59'),amount:0.035,exp:50,activity:'expedition',mapId:null,node:null,rank:null,label:'远征'});
 if(params.has('long'))for(let i=0;i<1050;i++)state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:00:00')+i*1000,amount:0.07,exp:100,mapId:71,node:4,rank:'S'});
 if(params.has('stress'))for(const e of state.events)if(e.source==='local'&&e.kind==='normal')e.amount*=100000;
 let language=normalize(params.get('lang')||'zh-CN');const subscribers=new Set();
@@ -100,9 +101,13 @@ async function preview(){
   await select('month','2026-10');doc.querySelector('[data-day="2026-10-31"]').click();await pause();
   assert(doc.querySelector('[data-hour="22"] .tile-value').textContent===tileNumber(params.has('stress')?70000:0.7),'Archive failed');
   await select('month','2026-11');
+  doc.querySelector('[data-day="2026-11-05"]').click();await pause();
+  doc.querySelector('[data-hour="16"]').click();await pause();
   const originalLanguage=language;
-  for(const lang of ['en-US','zh-CN','zh-TW','ja-JP','ko-KR']){api.setLanguage(lang);await pause();assert(doc.querySelector('h2').textContent===translator(lang)('Senka Ledger'),'Language switch failed')}
+  for(const lang of ['en-US','zh-CN','zh-TW','ja-JP','ko-KR']){api.setLanguage(lang);await pause();assert(doc.querySelector('h2').textContent===translator(lang)('Senka Ledger'),'Language switch failed');assert(doc.querySelector('[data-table="details"]').textContent.includes(translator(lang)('expedition')),'Expedition details must be localized')}
   api.setLanguage(originalLanguage);await pause();
+  doc.querySelector('[data-action="close-details"]').click();await pause();
+  doc.querySelector('[data-action="back"]').click();await pause();
   doc.body.dataset.interactions='yes';
  }
  if(['day','details'].includes(params.get('view'))){doc.querySelector('[data-day="2026-11-05"]').click();await pause()}

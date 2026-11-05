@@ -4,12 +4,13 @@ const { EO, QUESTS } = require('./ledger')
 const { parts } = require('./time')
 const { RANKING_PATH, createRankingReader, readRanking } = require('./ranking')
 const number = value => {
-  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null
+  if (!['number', 'string'].includes(typeof value) || String(value).trim() === '') return null
   const n = Number(value)
   return Number.isSafeInteger(n) && n >= 0 ? n : null
 }
 const BATTLES = new Set(['/kcsapi/api_req_sortie/battleresult', '/kcsapi/api_req_combined_battle/battleresult'])
 const PRACTICE = '/kcsapi/api_req_practice/battle_result'
+const EXPEDITION = '/kcsapi/api_req_mission/result'
 function createAdapter() {
   return { account: null, nickname: '', mapId: null, node: null, ranking: createRankingReader() }
 }
@@ -35,7 +36,8 @@ function decode(adapter, detail) {
   if (!adapter.account) return null
   const records = []
   const practice = path === PRACTICE
-  const result = BATTLES.has(path) || practice
+  const expedition = path === EXPEDITION
+  const result = BATTLES.has(path) || practice || expedition
   const push = data => records.push({ v: 1, at, ...data })
   if (path === RANKING_PATH) {
     const ranking = readRanking(adapter.ranking, body, at, adapter.nickname, adapter.account)
@@ -44,7 +46,7 @@ function decode(adapter, detail) {
   let exp = null
   if (basic) exp = number(basic.api_experience)
   else if (path === '/kcsapi/api_get_member/record') exp = number(body.api_experience?.[0])
-  else if (result || path === '/kcsapi/api_req_mission/result') exp = number(body.api_member_exp)
+  else if (result) exp = number(body.api_member_exp)
   if (path === '/kcsapi/api_req_map/start' || path === '/kcsapi/api_req_map/next') {
     const area = number(body.api_maparea_id) ?? number(postBody.api_maparea_id)
     const map = number(body.api_mapinfo_no) ?? number(postBody.api_mapinfo_no)
@@ -55,8 +57,8 @@ function decode(adapter, detail) {
   const mapLabel = adapter.mapId === null ? '海域未知' : `${Math.floor(adapter.mapId / 10)}-${adapter.mapId % 10}`
   if (exp !== null) push({ type: 'experience', exp,
     gain: result ? number(body.api_get_exp) : null,
-    ...(result ? { activity: practice ? 'practice' : 'sortie', mapId: practice ? null : adapter.mapId, node: practice ? null : adapter.node, rank: String(body.api_win_rank || '?') } : {}),
-    label: practice ? `演习 · ${body.api_win_rank || '?'}` : BATTLES.has(path) ? `${mapLabel}${adapter.node === null ? '' : ` 节点 ${adapter.node}`} · ${body.api_win_rank || '?'} 胜败` : '总经验观测' })
+    ...(result ? { activity: expedition ? 'expedition' : practice ? 'practice' : 'sortie', mapId: practice || expedition ? null : adapter.mapId, node: practice || expedition ? null : adapter.node, rank: expedition ? null : String(body.api_win_rank || '?') } : {}),
+    label: expedition ? '远征' : practice ? `演习 · ${body.api_win_rank || '?'}` : BATTLES.has(path) ? `${mapLabel}${adapter.node === null ? '' : ` 节点 ${adapter.node}`} · ${body.api_win_rank || '?'} 胜败` : '总经验观测' })
   const eoAmount = number(body.api_get_exmap_rate) || number(body.api_get_eo_rate)
   if (eoAmount && (BATTLES.has(path) || path === '/kcsapi/api_req_map/next' || path === '/kcsapi/api_req_map/start')) {
     const id = adapter.mapId !== null && Object.hasOwn(EO, adapter.mapId) ? adapter.mapId : null
