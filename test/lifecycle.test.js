@@ -12,15 +12,75 @@ const { summarize } = require('../src/model')
 const filename = path.resolve(__dirname, '..', 'index.js')
 function boot(directory) {
   const listeners = new Map()
+  let service = null
   const win = {
     addEventListener(name, fn) { const set = listeners.get(name) || new Set(); set.add(fn); listeners.set(name, set) },
     removeEventListener(name, fn) { listeners.get(name)?.delete(fn) }
   }
   const localRequire = createRequire(filename)
-  const context = { exports: {}, window: win, require: name => name === 'react' ? {} : name === 'views/env' ? { APPDATA_PATH: directory, isMain: true } : localRequire(name) }
+  const context = { exports: {}, window: win, require(name) {
+    if (name === 'react') return {}
+    if (name === 'views/env') return { APPDATA_PATH: directory, isMain: true }
+    if (name === './src/panel') return { createPanel: (_, value) => { service = value; return function Panel() {} } }
+    return localRequire(name)
+  } }
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context, { filename })
-  return { plugin: context.exports, listeners, send(detail) { for (const fn of listeners.get('game.response') || []) fn({ detail }) } }
+  return { plugin: context.exports, service, listeners,
+    send(detail) { for (const fn of listeners.get('game.response') || []) fn({ detail }) },
+    dispatch(name, event = {}) { for (const fn of listeners.get(name) || []) fn(event) }
+  }
 }
+
+test('cancelled beforeunload keeps recording, history and ranking data available', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const app = boot(directory)
+  t.after(() => {
+    app.plugin.pluginWillUnload()
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+  app.plugin.pluginDidLoad()
+  const time = Date.parse('2026-11-06T15:00:00+09:00')
+  app.send({ path: '/kcsapi/api_port/port', time, body: { api_basic: { api_member_id: 123, api_experience: 100000 } } })
+  app.send({ path: '/kcsapi/api_req_sortie/battleresult', time: time + 1000, body: { api_member_exp: 101000, api_get_exp: 1000 } })
+  const journal = app.service.entry('123')
+  journal.state.rankingHistory.push({ v: 1, type: 'ranking', at: time, period: time, entries: [{ rank: 250, score: 3200, self: true }] })
+  const updates = []
+  const unsubscribe = app.service.subscribe(state => updates.push(state))
+  t.after(unsubscribe)
+  app.dispatch('beforeunload', { defaultPrevented: true, returnValue: false })
+  assert.equal(app.listeners.get('game.response').size, 1)
+  assert.ok(fs.existsSync(path.join(directory, 'senka-ledger', '.writer-lock')))
+  assert.equal(app.service.entry('123'), journal)
+  assert.equal(journal.state.rankingHistory[0].entries[0].score, 3200)
+  app.send({ path: '/kcsapi/api_req_mission/result', time: time + 2000, body: { api_member_exp: 101050, api_get_exp: 50 } })
+  assert.ok(Math.abs(summarize(journal.state, '2026-11').total - 0.735) < 1e-12)
+  assert.equal(updates.at(-1).account, '123')
+})
+
+test('actual window unload releases the writer, updates status and retains the journal for restart', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const app = boot(directory)
+  t.after(() => {
+    app.plugin.pluginWillUnload()
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+  app.plugin.pluginDidLoad()
+  const time = Date.parse('2026-11-06T15:00:00+09:00')
+  app.send({ path: '/kcsapi/api_port/port', time, body: { api_basic: { api_member_id: 123, api_experience: 100000 } } })
+  app.send({ path: '/kcsapi/api_req_sortie/battleresult', time: time + 1000, body: { api_member_exp: 101000, api_get_exp: 1000 } })
+  const changes = []
+  const unsubscribe = app.service.subscribe(state => changes.push(state))
+  t.after(unsubscribe)
+  app.dispatch('unload')
+  assert.equal(app.listeners.get('game.response').size, 0)
+  assert.equal(app.listeners.get('unload').size, 0)
+  assert.equal(fs.existsSync(path.join(directory, 'senka-ledger', '.writer-lock')), false)
+  assert.equal(changes.at(-1).account, null)
+  const restarted = new Journal(path.join(directory, 'senka-ledger'))
+  try { assert.equal(summarize(restarted.load('123').state, '2026-11').total, 0.7) } finally { restarted.close() }
+})
 test('records before opening panel, unloads cleanly and resumes after restart', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
   t.after(() => {

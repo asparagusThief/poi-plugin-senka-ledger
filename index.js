@@ -56,13 +56,15 @@ exports.pluginDidLoad = function pluginDidLoad() {
   try {
     journal = new Journal(directory)
     window.addEventListener('game.response', onResponse)
-    window.addEventListener('beforeunload', exports.pluginWillUnload)
+    // beforeunload can be cancelled by poi's exit confirmation. Only release
+    // the recorder once the main window really unloads.
+    window.addEventListener('unload', exports.pluginWillUnload)
   } catch (e) { error = e.message }
   emit()
 }
 exports.pluginWillUnload = function pluginWillUnload() {
   window.removeEventListener('game.response', onResponse)
-  window.removeEventListener('beforeunload', exports.pluginWillUnload)
+  window.removeEventListener('unload', exports.pluginWillUnload)
   if (journal) journal.close()
   if (poiI18n && onLanguageChanged) poiI18n.off('languageChanged', onLanguageChanged)
   poiI18n = null
@@ -71,6 +73,7 @@ exports.pluginWillUnload = function pluginWillUnload() {
   adapter = createAdapter()
   error = null
   loaded = false
+  emit()
 }
 const service = {
   snapshot,
