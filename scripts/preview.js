@@ -7,7 +7,7 @@ const path = require('path')
 const root = path.resolve(__dirname, '..')
 const runtime = path.resolve(process.argv[2] || '.')
 const output = path.resolve(process.argv[3] || 'preview.html')
-const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'preferences', 'i18n', 'layout', 'icon', 'styles']
+const names = ['time', 'ledger', 'backup', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'preferences', 'i18n', 'layout', 'icon', 'styles']
 let bundle = names.map(name => `modules['./${name}']=function(module,exports,require){\n${fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')}\n};`).join('\n')
 for (const language of ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) bundle += `\nmodules['../i18n/${language}.json']=function(module){module.exports=${fs.readFileSync(path.join(root, 'i18n', language + '.json'), 'utf8')};};`
 const react = fs.readFileSync(path.join(runtime, 'react.production.min.js'), 'utf8')
@@ -16,10 +16,12 @@ const hostStyle = 'html,body{margin:0;height:100%;overflow:hidden;background:#ed
 const hostHTML = '<style>' + hostStyle + '</style><div id="plugin-mountpoint"><header class="titlebar">Senka Ledger · Sample data</header><div class="poi-app-tabpane"><div id="app"></div></div></div>'
 const script = `
 const modules={},cache={};
+const Buffer={byteLength:value=>new TextEncoder().encode(value).length};const setImmediate=fn=>setTimeout(fn,0);
 ${bundle}
 function require(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;modules[id](m,m.exports,require);return m.exports;}
 const params=new URLSearchParams(location.search);
-const {createLedger,apply}=require('./ledger');const {translator,normalize}=require('./i18n');
+const {createLedger,apply:applyLedger}=require('./ledger');const {translator,normalize}=require('./i18n');
+const records=[];const apply=(state,input)=>{records.push(input);applyLedger(state,input)};
 const state=createLedger();const at=s=>Date.parse(s+'+09:00');let total=10000000;
 apply(state,{v:1,type:'experience',at:at('2026-10-30T20:00:00'),exp:total,gain:null,label:'母港'});
 total+=1000;apply(state,{v:1,type:'experience',at:at('2026-10-31T22:20:00'),exp:total,gain:1000,label:'7-1 节点 4 · S 胜败'});
@@ -41,7 +43,8 @@ if(params.has('long'))for(let i=0;i<1050;i++)state.events.push({id:++state.seque
 if(params.has('unknownlong'))for(let i=0;i<8;i++)state.events.push({id:++state.sequence,source:'unknown',kind:'normal',at:at('2026-11-04T08:00:00')+i*60000,from:at('2026-11-04T07:00:00')+i*60000,to:at('2026-11-04T08:00:00')+i*60000,amount:0.035,label:'未定位'});
 if(params.has('stress'))for(const e of state.events)if(e.source==='local'&&e.kind==='normal')e.amount*=100000;
 let language=normalize(params.get('lang')||'zh-CN'),zone=localStorage.getItem('senka-preview-zone')||'Asia/Tokyo';const subscribers=new Set();
-const service={snapshot:()=>({account:'12345678',accounts:['12345678'],accountNames:{'12345678':'Sample Admiral'},zone,language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:()=>({state}),setZone(value){zone=value;localStorage.setItem('senka-preview-zone',value);for(const cb of subscribers)cb(service.snapshot())},export:()=>{doc.body.dataset.exported='yes'}};
+const states=new Map([['12345678',state]]),journals=new Map([['12345678',records]]);
+const service={snapshot:()=>({account:'12345678',accounts:[...states.keys()],accountNames:{'12345678':'Sample Admiral'},zone,language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:account=>({state:states.get(account)}),setZone(value){zone=value;localStorage.setItem('senka-preview-zone',value);for(const cb of subscribers)cb(service.snapshot())},export:(account,month,zone,type)=>{doc.body.dataset.exported=type;api.lastExport={account,month,zone,type}},async import(file){const {parseBackup,mergeRecords}=require('./backup');const backup=await parseBackup(await file.text());const merged=await mergeRecords(journals.get(backup.account)||[],backup.records);const next=createLedger();for(const input of merged.records)applyLedger(next,input);states.set(backup.account,next);journals.set(backup.account,merged.records);for(const cb of subscribers)cb(service.snapshot());return{account:backup.account,added:merged.added,skipped:merged.skipped,latestAt:merged.records[merged.records.length-1].at}}};
 const Panel=require('./panel').createPanel(React,service);
 let doc=document;let popup=null;
 const reactRoot=ReactDOM.createRoot(document.getElementById('app'));

@@ -2,56 +2,54 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-A local senka ledger for **poi 12.0.1+**.
+A local senka history plugin for **poi 12.0.1+**.
 
 ## Features
 
-- Monthly history with daily and hourly senka values; click a date or hour to view details.
-- Local sortie, practice and expedition rewards, calculated as `Admiral EXP × 7 / 10000`. EO and supported quest rewards appear in the summaries.
-- Unrecorded EXP gains shown separately with a total and possible time intervals, without assigning them to the login day or hour.
-- Ranking snapshots for yourself and positions **1, 5, 20, 100 and 500**, including gaps and changes since the preceding refresh.
-- Details with previous/next buttons and mouse-wheel paging. Each page fits the window, up to 10 records.
-- Remembered time zone, Admiral names in the account list, CSV export, JSON backup and separate journals for each account.
-- English, Simplified Chinese, Traditional Chinese, Japanese and Korean; works in the main panel and separate windows.
+- Browse monthly history, daily values and hourly details.
+- Track sortie, practice and expedition EXP, with EO and quest rewards in the summary.
+- View unrecorded EXP gains separately, with totals and possible time intervals.
+- Compare your ranking score with ranks **1, 5, 20, 100 and 500**, and with the previous ranking refresh.
+- Keep separate account histories, save your time zone, and back up or restore records.
 
-## Use
+Available in English, Simplified Chinese, Traditional Chinese, Japanese and Korean. Supports poi's main panel and separate windows.
 
-1. Install `poi-plugin-senka-ledger` through poi's plugin manager or download the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
-2. Enable the plugin and enter the home port to establish the EXP baseline.
-3. Select an account, month and time zone. The time zone is saved for future sessions. Account names are learned from home-port data; unread names use the account ID. Click a date for hourly values, then an hour for details.
+## Getting started
 
-Open the ranking list in the game and visit the relevant pages to record ranking scores. Changes compare the immediately preceding **03:00 / 15:00 JST** refresh; missing prior records show `—`. The plugin does not make game requests.
+Install `poi-plugin-senka-ledger` in poi's plugin manager, or use a package from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases). Enable the plugin and enter the home port to start recording.
 
-## Data
+Choose an account and month. Click a date for hourly values, then an hour for details. Use the buttons or mouse wheel to change detail pages. Admiral names are read from the home port; accounts without a known name display their ID.
 
-History starts when recording begins. Local rewards use their observed result time. Unrecorded gains retain their complete possible intervals; overlapping daily or monthly interval totals must not be added together. Activity totals do not include ranking carryover or official month-end adjustments.
+To capture ranking scores, open the in-game ranking list and visit the relevant pages. Changes compare the preceding **03:00 / 15:00 JST** refresh. Missing previous scores show `—`.
 
-Supported senka quests: `854, 888, 893, 872, 284, 845, 903`.
+## Import and export
 
-Startup or configuration problems: [configuration recovery guide](https://github.com/asparagusThief/poi-plugin-senka-ledger/blob/main/docs/recovery.md).
+Open **Data** on the right:
 
-Journals are stored in `APPDATA_PATH/senka-ledger/<accountID>.jsonl`. JSON backs up the full history for moving computers, reinstalling poi or recovering damaged data. To restore, close all poi instances and save the backup's `journal` text as `<accountID>.jsonl` in this folder, after backing up the existing file. There is no in-app import. CSV is intended for viewing and analysis. Tokens, passwords and complete API responses are not stored.
+| Action | Purpose |
+| --- | --- |
+| Export month CSV | View or analyze the selected account's records for the selected month in a spreadsheet. |
+| Export JSON (all history) | Back up all history for the selected account, for recovery or moving computers. |
+| Import JSON | Select a JSON backup exported by Senka Ledger, including backups from earlier versions. |
+
+Import merges records into the account identified by the backup, skips duplicates and preserves local history. Other accounts remain separate. The existing journal is backed up before changes. Invalid files leave local records unchanged. The backup and merged journal must each fit within **32 MB / 100,000 records**.
+
+## About the records
+
+History starts when recording begins. Normal senka is calculated as `Admiral EXP × 7 / 10000`; EO and supported quests appear in the summary. Supported quest IDs: `854, 888, 893, 872, 284, 845, 903`.
+
+Unrecorded EXP gains retain their possible time intervals instead of being assigned to the login time. Intervals spanning days or months can appear in several views; do not add those totals together. Activity totals exclude official ranking carryover and month-end adjustments.
+
+Records are stored in `APPDATA_PATH/senka-ledger/`. Tokens, passwords and complete API responses are not saved.
 
 ## Preview
 
-Screenshots use sample data.
+Sample data.
 
-![Monthly view](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
+![Monthly history](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/month.png)
 
-![Hourly view](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
+![Hourly details](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/day.png)
 
-![Detail dialog](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/details.png)
-
-## Development
-
-Node.js 20+. Runtime libraries are provided by poi.
-
-```text
-npm run check
-npm test
-npm run pack:local
-```
-
-Packages are generated in `dist/`. `scripts/install-local.ps1` installs from source without overwriting an existing plugin.
+![Record details](https://raw.githubusercontent.com/asparagusThief/poi-plugin-senka-ledger/main/docs/details.png)
 
 MIT license.

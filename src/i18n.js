@@ -22,6 +22,7 @@ function translator(language) {
 }
 function errorText(error, t) {
   const message = error?.message || String(error || '')
+  if (message.startsWith('import')) return t(message, error?.values)
   if (message.startsWith('存储锁无效')) return t('invalidLock')
   if (message.startsWith('另一个 poi')) return t('locked')
   if (message === 'Invalid account') return t('invalidAccount')

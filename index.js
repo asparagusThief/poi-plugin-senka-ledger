@@ -11,6 +11,7 @@ const { register } = require('./src/icon')
 const { RANKING_PATH } = require('./src/ranking')
 const { resources, namespace, translator } = require('./src/i18n')
 const { Preferences } = require('./src/preferences')
+const { MAX_BACKUP_BYTES } = require('./src/backup')
 const { description } = require('./package.json')
 // Register before poi re-reads the manifest and builds the menu icon.
 try { register(require('@fortawesome/fontawesome-svg-core').library) } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }
@@ -101,6 +102,16 @@ const service = {
   entry(account) {
     if (!journal || !account) return null
     try { return journal.load(account) } catch (e) { return { error: e.message } }
+  },
+  async import(file) {
+    if (!journal) throw new Error('存储尚未初始化')
+    if (!file || file.size > MAX_BACKUP_BYTES) throw new Error('importTooLarge')
+    const target = journal
+    const contents = await file.text()
+    if (journal !== target) throw new Error('存储尚未初始化')
+    const result = await target.importBackup(contents)
+    emit()
+    return result
   },
   export(account, month, zone, type, language) {
     if (!journal) throw new Error('存储尚未初始化')

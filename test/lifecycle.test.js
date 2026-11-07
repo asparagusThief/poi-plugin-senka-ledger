@@ -141,6 +141,30 @@ test('panel time zone and Admiral names persist through unload and reload and fo
   assert.equal(app.service.snapshot().zone, 'Asia/Shanghai')
   assert.equal(app.service.snapshot().accountNames['123'], '雪風提督')
 })
+test('JSON import notifies panels, selects the backup account and keeps live recording available', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const app = boot(directory)
+  t.after(() => {
+    app.plugin.pluginWillUnload()
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+  app.plugin.pluginDidLoad()
+  const time = Date.parse('2026-11-07T10:00:00+09:00')
+  app.send({ path: '/kcsapi/api_port/port', time, body: { api_basic: { api_member_id: 123, api_experience: 100000 } } })
+  const updates = [], unsubscribe = app.service.subscribe(value => updates.push(value))
+  t.after(unsubscribe)
+  const records = [{ v: 1, type: 'experience', at: time, exp: 200000, gain: null, label: '母港' }]
+  const contents = JSON.stringify({ format: 'poi-senka-ledger', version: 1, account: '18176312', journal: JSON.stringify(records[0]) + '\n' })
+  const result = await app.service.import({ size: contents.length, text: async () => contents })
+  assert.equal(result.account, '18176312')
+  assert.ok(updates.at(-1).accounts.includes('18176312'))
+  assert.equal(updates.at(-1).account, '123')
+  assert.equal(app.service.entry('18176312').state.baseline.exp, 200000)
+  app.send({ path: '/kcsapi/api_req_sortie/battleresult', time: time + 1000, body: { api_member_exp: 101000, api_get_exp: 1000 } })
+  assert.equal(summarize(app.service.entry('123').state, '2026-11').normal, 0.7)
+})
+
 test('poi integration registers original icon, follows language changes and migrates old window preferences', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
   const listeners = new Map()

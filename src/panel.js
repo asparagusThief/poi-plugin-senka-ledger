@@ -29,8 +29,12 @@ function createPanel(React, service) {
     const [detailPage, setDetailPage] = React.useState(0)
     const [pageSize, setPageSize] = React.useState(10)
     const [exportError, setExportError] = React.useState('')
+    const [importing, setImporting] = React.useState(false)
+    const [importResult, setImportResult] = React.useState(null)
     const root = React.useRef(null)
     const dialog = React.useRef(null)
+    const dataMenu = React.useRef(null)
+    const fileInput = React.useRef(null)
     const pageState = React.useRef(null)
     const titleId = React.useId()
     const language = normalize(status.language)
@@ -44,6 +48,21 @@ function createPanel(React, service) {
     const tileNumber = n => formats.tile.format(n)
     React.useEffect(() => service.subscribe(setStatus), [])
     React.useEffect(() => bindPanel(root.current), [])
+    React.useEffect(() => {
+      const document = root.current.ownerDocument
+      const dismiss = event => {
+        if (!dataMenu.current?.open) return
+        if (event.type === 'keydown') {
+          if (event.key !== 'Escape') return
+          event.preventDefault()
+          dataMenu.current.open = false
+          dataMenu.current.querySelector('summary').focus()
+        } else if (!dataMenu.current.contains(event.target)) dataMenu.current.open = false
+      }
+      document.addEventListener('pointerdown', dismiss)
+      document.addEventListener('keydown', dismiss)
+      return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss) }
+    }, [])
     React.useEffect(() => {
       const view = root.current?.ownerDocument.defaultView
       if (view?.isWindowMode) root.current.ownerDocument.title = t('Senka Ledger')
@@ -117,9 +136,24 @@ function createPanel(React, service) {
     const openDay = value => { setDay(value); setSlot(null); closeDetails() }
     const openDetails = (kind, hour = null) => { setSlot(hour); setDetailPage(0); setDetailKind(kind) }
     const download = type => {
+      dataMenu.current.open = false
       try { service.export(account, month, zone, type, language); setExportError('') } catch (error) { setExportError(error.message) }
     }
-    const failure = status.error || entry?.error || exportError
+    const readJSON = async event => {
+      const file = event.target.files?.[0]
+      event.target.value = ''
+      if (!file || importing) return
+      setImporting(true); setImportResult(null); setExportError('')
+      try {
+        const result = await service.import(file)
+        setViewAccount(result.account)
+        if (result.latestAt !== null) setMonth(parts(result.latestAt, zone).month)
+        back(); setImportResult(result)
+      } catch (error) { setExportError(error) }
+      finally { setImporting(false) }
+    }
+    const storageFailure = status.error || entry?.error
+    const failure = storageFailure || exportError
     const changeText = value => value === null ? '—' : `${value > 0 ? '+' : ''}${fmt(value)}`
     const detailsTitle = detailKind === 'unknown' ? t('unknown') : `${selected?.day || month} · ${slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })}`
     const rankingPanel = h('details', { className: 'ranking', 'aria-label': t('rankTitle') },
@@ -135,7 +169,7 @@ function createPanel(React, service) {
             h('td', null, gap === null || row.self ? '—' : changeText(gap)), h('td', null, row ? stamp(row.at) : '—'))
         })))) : h('p', { className: 'muted empty' }, t('rankWaiting')))
     return h('div', { className: 'sl-shell', ref: root }, h('main', { className: 'sl', 'data-view': selected ? 'day' : 'month', lang: language }, h('style', null, style),
-      h('div', { className: 'top' }, h('div', { className: 'brand' }, createIcon(React), h('h2', null, t('Senka Ledger'))), h('span', { className: 'tag' }, t(failure ? 'storageError' : status.account ? 'recording' : 'waiting'))),
+      h('div', { className: 'top' }, h('div', { className: 'brand' }, createIcon(React), h('h2', null, t('Senka Ledger'))), h('span', { className: 'tag' }, t(storageFailure ? 'storageError' : status.account ? 'recording' : 'waiting'))),
       failure && h('p', { role: 'alert', className: 'error' }, errorText(failure, t)),
       h('div', { className: 'workspace' },
         h('section', { className: 'activity-pane' },
@@ -165,13 +199,20 @@ function createPanel(React, service) {
             h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => {
               try { service.setZone(e.target.value); setExportError(''); setSlot(null); closeDetails() } catch (error) { setExportError(error.message) }
             } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
-            h('button', { disabled: !account, onClick: () => download('csv') }, t('exportCSV')), h('button', { disabled: !account, onClick: () => download('json') }, t('backupJSON'))),
+            h('details', { className: 'data-menu', ref: dataMenu, 'data-menu': 'data' },
+              h('summary', { 'data-action': 'data-menu' }, t('dataMenu'), h('span', { 'aria-hidden': true }, '▾')),
+              h('div', { className: 'data-actions' },
+                h('button', { 'data-action': 'export-csv', disabled: !account || importing, onClick: () => download('csv') }, t('exportCSV')),
+                h('button', { 'data-action': 'export-json', disabled: !account || importing, onClick: () => download('json') }, t('backupJSON')),
+                h('button', { 'data-action': 'import-json', disabled: importing, onClick: () => { dataMenu.current.open = false; fileInput.current.click() } }, t('importJSON')))),
+            h('input', { type: 'file', accept: '.json,application/json', hidden: true, ref: fileInput, 'data-control': 'import-file', onChange: readJSON })),
+          (importing || importResult) && h('p', { className: 'data-message', role: 'status' }, importing ? t('importing') : t('importComplete', { account: accountLabel(importResult.account, status.accountNames), added: importResult.added, skipped: importResult.skipped })),
           h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
           h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') },
             h('span', { className: 'unknown-heading card-label' }, t('unknown')),
             h('span', { className: 'unknown-total', 'data-summary': 'unknownTotal' }, t('total'), ' ', h('strong', { className: 'amber value' }, fmt(unknownTotal))),
             h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
-      h('div', { className: 'foot' }, 'v0.2.7'),
+      h('div', { className: 'foot' }, 'v0.2.8'),
       h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
         onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
         detailKind && h(React.Fragment, null,

@@ -2,7 +2,9 @@
 
 const fs = require('fs')
 const path = require('path')
+const { randomUUID } = require('crypto')
 const { createLedger, apply, validInput } = require('./ledger')
+const { MAX_BACKUP_BYTES, parseBackup, parseRecords, mergeRecords, pause, fail } = require('./backup')
 
 class Journal {
   constructor(directory) {
@@ -32,7 +34,7 @@ class Journal {
   load(account) {
     if (!/^\d+$/.test(account)) throw new Error('Invalid account')
     if (this.accounts.has(account)) return this.accounts.get(account)
-    const entry = { state: createLedger(), file: path.join(this.directory, account + '.jsonl'), error: null }
+    const entry = { state: createLedger(), file: path.join(this.directory, account + '.jsonl'), error: null, revision: 0 }
     let contents = ''
     try { contents = fs.readFileSync(entry.file, 'utf8') } catch (error) { if (error.code !== 'ENOENT') throw error }
     const lines = contents.split('\n')
@@ -52,6 +54,7 @@ class Journal {
     return entry
   }
   append(account, input) {
+    if (this.closed) throw new Error('存储尚未初始化')
     if (!validInput(input)) throw new Error('Invalid ledger record')
     const entry = this.load(account)
     if (entry.error) throw new Error(entry.error)
@@ -64,8 +67,72 @@ class Journal {
       throw error
     } finally { fs.closeSync(fd) }
     apply(entry.state, input)
+    entry.revision++
+  }
+  async importBackup(contents) {
+    if (this.importing) throw fail('importBusy')
+    if (this.closed) throw new Error('存储尚未初始化')
+    this.importing = true
+    try {
+      const backup = await parseBackup(contents)
+      const entry = this.load(backup.account)
+      if (entry.error) throw new Error(entry.error)
+      // Recording continues while files are read and the history is rebuilt.
+      // If a new response arrives, retry with that response included.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const revision = entry.revision
+        let original = ''
+        try {
+          if ((await fs.promises.stat(entry.file)).size > MAX_BACKUP_BYTES) throw fail('importTooLarge')
+          original = await fs.promises.readFile(entry.file, 'utf8')
+        } catch (error) { if (error.code !== 'ENOENT') throw error }
+        const local = original ? await parseRecords(original) : []
+        const merged = await mergeRecords(local, backup.records)
+        const state = createLedger(), lines = []
+        for (let i = 0; i < merged.records.length; i++) {
+          const record = merged.records[i]
+          apply(state, record)
+          lines.push(JSON.stringify(record))
+          if (i % 500 === 499) await pause()
+        }
+        const data = lines.join('\n') + '\n'
+        if (Buffer.byteLength(data, 'utf8') > MAX_BACKUP_BYTES) throw fail('importTooLarge')
+        if (this.closed) throw new Error('存储尚未初始化')
+        if (entry.error) throw new Error(entry.error)
+        if (entry.revision !== revision) continue
+        const result = { account: backup.account, added: merged.added, skipped: merged.skipped, latestAt: merged.records.at(-1).at }
+        if (!merged.added) return result
+        const suffix = Date.now() + '-' + randomUUID()
+        const temporary = entry.file + '.import-' + suffix + '.tmp'
+        const previous = original ? entry.file + '.before-import-' + suffix + '.bak' : null
+        let committed = false
+        try {
+          await this.writeImportFile(temporary, data)
+          if (previous) await this.writeImportFile(previous, original)
+          if (this.closed) throw new Error('存储尚未初始化')
+          if (entry.error) throw new Error(entry.error)
+          if (entry.revision !== revision) continue
+          // No await between the revision check and replacement: a live append
+          // can never be lost between these two operations.
+          fs.renameSync(temporary, entry.file)
+          committed = true
+          entry.state = state
+          entry.revision++
+          return result
+        } finally {
+          await fs.promises.unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error })
+          if (!committed && previous) await fs.promises.unlink(previous).catch(error => { if (error.code !== 'ENOENT') throw error })
+        }
+      }
+      throw fail('importChanged')
+    } finally { this.importing = false }
+  }
+  async writeImportFile(file, contents) {
+    const handle = await fs.promises.open(file, 'wx')
+    try { await handle.writeFile(contents, 'utf8'); await handle.sync() } finally { await handle.close() }
   }
   close() {
+    this.closed = true
     if (this.lock !== undefined) {
       fs.closeSync(this.lock)
       this.lock = undefined
