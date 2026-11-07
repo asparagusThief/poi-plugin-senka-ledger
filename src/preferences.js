@@ -23,8 +23,11 @@ class Preferences {
   }
   rememberName(account, name) {
     if (!/^\d+$/.test(String(account)) || typeof name !== 'string' || !name.trim() || this.accountNames[account] === name) return false
-    this.config?.set(`${KEY}.accountNames.${account}`, name)
-    this.accountNames[account] = name
+    const names = { ...this.accountNames, [account]: name }
+    // poi uses lodash.set: a numeric path component creates a sparse array.
+    // Always replace the complete map so account IDs remain object keys.
+    this.config?.set(`${KEY}.accountNames`, names)
+    this.accountNames = names
     return true
   }
   snapshot() { return { zone: this.zone, accountNames: { ...this.accountNames } } }

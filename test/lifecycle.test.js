@@ -110,11 +110,10 @@ test('records before opening panel, unloads cleanly and resumes after restart', 
 
 test('panel time zone and Admiral names persist through unload and reload and follow account changes', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
-  const prefix = 'plugin.poi-plugin-senka-ledger', names = {}, values = new Map([[`${prefix}.accountNames`, names]])
+  const prefix = 'plugin.poi-plugin-senka-ledger', values = new Map()
   const writes = []
   const config = { get: key => values.get(key), set(key, value) {
     values.set(key, value); writes.push([key, value])
-    if (key.startsWith(`${prefix}.accountNames.`)) names[key.split('.').pop()] = value
   } }
   const app = boot(directory, config)
   t.after(() => {
@@ -132,7 +131,7 @@ test('panel time zone and Admiral names persist through unload and reload and fo
   app.send(port(123, '雪風提督', time))
   app.send(port(123, '雪風提督', time + 1000))
   assert.equal(snapshots.at(-1).accountNames['123'], '雪風提督')
-  assert.equal(writes.filter(([key]) => key === `${prefix}.accountNames.123`).length, 1)
+  assert.equal(writes.filter(([key]) => key === `${prefix}.accountNames`).length, 1)
   app.send(port(456, '別の提督', time + 2000))
   assert.equal(snapshots.at(-1).accountNames['123'], '雪風提督')
   assert.equal(snapshots.at(-1).accountNames['456'], '別の提督')

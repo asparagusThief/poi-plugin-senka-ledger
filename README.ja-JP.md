@@ -28,6 +28,8 @@
 
 対応する戦果任務：`854, 888, 893, 872, 284, 845, 903`。
 
+起動や設定ファイルに問題がある場合は[設定の復旧手順](https://github.com/asparagusThief/poi-plugin-senka-ledger/blob/main/docs/recovery.md)を参照してください。
+
 ログの保存先は `APPDATA_PATH/senka-ledger/<アカウントID>.jsonl` です。JSON は PC 移行、poi の再インストール、データ破損時の全履歴復元に使えます。復元時はすべての poi を終了し、元ファイルをバックアップしてから、JSON の `journal` の本文をこのフォルダーの `<アカウントID>.jsonl` として保存してください。画面からのインポートは未対応です。日常の閲覧・分析には CSV を使えます。token・パスワード・API 応答全体は保存しません。
 
 ## プレビュー

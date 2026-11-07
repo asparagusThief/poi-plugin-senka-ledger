@@ -11,7 +11,7 @@ function configStore(initial = {}) {
       writes.push([key, value])
       const keys = key.split('.'), last = keys.pop()
       let node = initial
-      for (const part of keys) node = node[part] ||= {}
+      for (let i = 0; i < keys.length; i++) node = node[keys[i]] ||= /^\d+$/.test(keys[i + 1] ?? last) ? [] : {}
       node[last] = value
     }
   }
@@ -38,6 +38,19 @@ test('account labels distinguish identical names and retain an ID fallback for u
   assert.equal(accountLabel('123', { 123: '提督' }), '提督')
   assert.equal(accountLabel('456', { 123: '提督' }), '456')
   assert.equal(accountLabel('123', { 123: '提督', 456: '提督' }), '提督 (123)')
+})
+
+test('eight-digit account IDs are stored in a compact object rather than a sparse array', () => {
+  const config = configStore()
+  const prefs = new Preferences(config)
+  prefs.rememberName('18176312', 'Sample Admiral')
+  prefs.rememberName('99999999', 'Second Admiral')
+  const saved = config.get('plugin.poi-plugin-senka-ledger.accountNames')
+  assert.equal(Array.isArray(saved), false)
+  assert.deepEqual(Object.keys(saved), ['18176312', '99999999'])
+  assert.ok(JSON.stringify(config.data).length < 500)
+  assert.deepEqual(new Preferences(config).accountNames, saved)
+  assert.ok(config.writes.every(([key]) => !/\.\d+$/.test(key)))
 })
 
 test('invalid saved preferences are ignored and failed writes do not claim a setting was saved', () => {

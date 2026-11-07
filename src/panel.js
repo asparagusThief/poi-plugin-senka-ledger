@@ -35,15 +35,20 @@ function createPanel(React, service) {
     const titleId = React.useId()
     const language = normalize(status.language)
     const t = translator(language)
-    const fmt = n => n.toLocaleString(language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    const tileNumber = n => n.toLocaleString(language, { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const formats = React.useMemo(() => ({
+      score: new Intl.NumberFormat(language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      tile: new Intl.NumberFormat(language, { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      integer: new Intl.NumberFormat(language)
+    }), [language])
+    const fmt = n => formats.score.format(n)
+    const tileNumber = n => formats.tile.format(n)
     React.useEffect(() => service.subscribe(setStatus), [])
     React.useEffect(() => bindPanel(root.current), [])
     React.useEffect(() => {
       const view = root.current?.ownerDocument.defaultView
       if (view?.isWindowMode) root.current.ownerDocument.title = t('Senka Ledger')
     }, [language])
-    React.useLayoutEffect(() => {
+    React.useEffect(() => {
       if (detailKind && !dialog.current.open) dialog.current.showModal()
       else if (!detailKind && dialog.current.open) dialog.current.close()
     }, [detailKind])
@@ -53,32 +58,35 @@ function createPanel(React, service) {
     const account = viewAccount || status.account || status.accounts[0] || ''
     const entry = service.entry(account)
     const state = entry?.state || createLedger()
-    const allMonths = [...new Set([parts(Date.now(), zone).month, month, ...months(state, zone)])].sort().reverse()
-    const stats = summarize(state, month, zone)
+    const currentMonth = parts(Date.now(), zone).month
+    const allMonths = React.useMemo(() => [...new Set([currentMonth, month, ...months(state, zone)])].sort().reverse(), [state, status, zone, month, currentMonth])
+    const stats = React.useMemo(() => summarize(state, month, zone), [state, status, month, zone])
     const selected = stats.days.find(d => d.day === day) || null
     const totals = selected || stats
-    const ranks = rankingSnapshot(state.rankingHistory, month)
+    const ranks = React.useMemo(() => rankingSnapshot(state.rankingHistory, month), [state, status, month])
     const own = ranks.rows.find(row => row.self)
     const rankRows = [...new Set([...ANCHORS, ...(own ? [own.rank] : [])])].sort((a, b) => a - b)
     const maxDay = Math.max(0, ...stats.days.map(d => d.normal))
     const maxHour = selected ? Math.max(0, ...selected.slots) : 0
-    const timeline = selected ? selected.events.filter(e => slot === null || parts(e.at, zone).hour === slot).slice().sort((a, b) => b.at - a.at || b.id - a.id) : []
+    const timeline = React.useMemo(() => selected ? selected.events.filter(e => slot === null || parts(e.at, zone).hour === slot).slice().sort((a, b) => b.at - a.at || b.id - a.id) : [], [selected, slot, zone])
     const [start] = monthBounds(month, zone)
     const selectedStart = selected ? start + (Number(selected.day.slice(-2)) - 1) * DAY : null
-    const unknown = stats.unknown.filter(e => !selected || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at)
+    const unknown = React.useMemo(() => stats.unknown.filter(e => selectedStart === null || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at), [stats, selectedStart])
     const unknownTotal = unknown.reduce((sum, e) => sum + e.amount, 0)
     const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage, pageSize)
     pageState.current = page
-    React.useLayoutEffect(() => {
+    React.useEffect(() => {
       if (!detailKind) return
       const element = dialog.current
       const view = element.ownerDocument.defaultView
-      const update = () => setPageSize(fitPageSize(element))
-      const observer = new view.ResizeObserver(update)
-      observer.observe(element)
-      view.addEventListener('resize', update)
+      let frame = null
+      const update = () => { frame = null; setPageSize(fitPageSize(element)) }
+      const schedule = () => { if (frame === null) frame = view.requestAnimationFrame(update) }
+      // Measuring the dialog in its own ResizeObserver can feed its new page
+      // size back into layout. Recalculate only on opening or viewport resize.
+      view.addEventListener('resize', schedule)
       update()
-      return () => { observer.disconnect(); view.removeEventListener('resize', update) }
+      return () => { if (frame !== null) view.cancelAnimationFrame(frame); view.removeEventListener('resize', schedule) }
     }, [detailKind, language])
     React.useEffect(() => {
       if (!detailKind) return
@@ -87,9 +95,16 @@ function createPanel(React, service) {
     const offset = (new Date(month + '-01T00:00:00Z').getUTCDay() + 6) % 7
     React.useEffect(() => {
       fitNumbers(root.current)
-      const observer = new root.current.ownerDocument.defaultView.ResizeObserver(() => fitNumbers(root.current))
+      const view = root.current.ownerDocument.defaultView
+      let width = root.current.clientWidth, frame = null
+      const observer = new view.ResizeObserver(entries => {
+        const next = entries[0].contentRect.width
+        if (Math.abs(next - width) < 1) return
+        width = next
+        if (frame === null) frame = view.requestAnimationFrame(() => { frame = null; fitNumbers(root.current) })
+      })
       observer.observe(root.current)
-      return () => observer.disconnect()
+      return () => { observer.disconnect(); if (frame !== null) view.cancelAnimationFrame(frame) }
     }, [month, day, zone, language, status, account])
     const card = (key, value, accent = false) => h('div', { className: 'card', 'data-summary': key }, h('div', { className: 'muted card-label' }, t(key)), h('div', { className: `value${accent ? ' accent' : ''}` }, fmt(value)))
     const th = labels => h('thead', null, h('tr', null, ...labels.map(key => h('th', { key }, t(key)))))
@@ -156,7 +171,7 @@ function createPanel(React, service) {
             h('span', { className: 'unknown-heading card-label' }, t('unknown')),
             h('span', { className: 'unknown-total', 'data-summary': 'unknownTotal' }, t('total'), ' ', h('strong', { className: 'amber value' }, fmt(unknownTotal))),
             h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
-      h('div', { className: 'foot' }, 'v0.2.6'),
+      h('div', { className: 'foot' }, 'v0.2.7'),
       h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
         onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
         detailKind && h(React.Fragment, null,
@@ -166,7 +181,7 @@ function createPanel(React, service) {
           h('div', { className: 'dialog-body' }, h('table', { className: detailKind === 'unknown' ? 'unknown-table' : 'details-table', 'data-table': detailKind === 'unknown' ? 'unknown' : 'details' },
             th(detailKind === 'unknown' ? ['interval', 'detected', 'senka'] : ['time', 'experience', 'senka', 'map']), h('tbody', null,
               ...page.items.map(e => detailKind === 'unknown' ? h('tr', { key: e.id }, h('td', null, stamp(e.from), '→', stamp(e.to)), h('td', null, stamp(e.at)), h('td', { className: 'amber' }, fmt(e.amount))) :
-                h('tr', { key: e.id }, h('td', null, formatTime(e.at, zone).slice(11)), h('td', null, e.exp.toLocaleString(language)), h('td', null, fmt(e.amount)), h('td', null, battleText(e, t)))),
+                h('tr', { key: e.id }, h('td', null, formatTime(e.at, zone).slice(11)), h('td', null, formats.integer.format(e.exp)), h('td', null, fmt(e.amount)), h('td', null, battleText(e, t)))),
               !page.items.length && h('tr', null, h('td', { colSpan: detailKind === 'unknown' ? 3 : 4, className: 'empty' }, t('empty')))))),
           h('footer', { className: 'dialog-footer' }, h('button', { 'data-action': 'previous-page', disabled: page.page === 0, onClick: () => setDetailPage(page.page - 1) }, t('previousPage')),
             h('span', null, t('page', { page: page.page + 1, pages: page.pages })), h('button', { 'data-action': 'next-page', disabled: page.page === page.pages - 1, onClick: () => setDetailPage(page.page + 1) }, t('nextPage')))))))

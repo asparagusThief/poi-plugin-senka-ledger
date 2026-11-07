@@ -28,6 +28,8 @@
 
 支持的战果任务：`854, 888, 893, 872, 284, 845, 903`。
 
+遇到启动卡住或配置文件异常增大，参见[配置恢复说明](https://github.com/asparagusThief/poi-plugin-senka-ledger/blob/main/docs/recovery.md)。
+
 日志位于 `APPDATA_PATH/senka-ledger/<账号ID>.jsonl`。JSON 用于换电脑、重装 poi 或数据损坏后恢复全部历史。还原时关闭所有 poi，备份原文件，再把 JSON 中 `journal` 字段的完整文本保存为该目录下的 `<账号ID>.jsonl`。目前没有界面导入功能；日常查看和整理数据可使用 CSV。不保存 token、密码或完整 API 响应。
 
 ## 预览

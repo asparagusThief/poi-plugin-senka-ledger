@@ -28,6 +28,8 @@ History starts when recording begins. Local rewards use their observed result ti
 
 Supported senka quests: `854, 888, 893, 872, 284, 845, 903`.
 
+Startup or configuration problems: [configuration recovery guide](https://github.com/asparagusThief/poi-plugin-senka-ledger/blob/main/docs/recovery.md).
+
 Journals are stored in `APPDATA_PATH/senka-ledger/<accountID>.jsonl`. JSON backs up the full history for moving computers, reinstalling poi or recovering damaged data. To restore, close all poi instances and save the backup's `journal` text as `<accountID>.jsonl` in this folder, after backing up the existing file. There is no in-app import. CSV is intended for viewing and analysis. Tokens, passwords and complete API responses are not stored.
 
 ## Preview

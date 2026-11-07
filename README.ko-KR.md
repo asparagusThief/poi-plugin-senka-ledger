@@ -28,6 +28,8 @@
 
 지원하는 전과 임무: `854, 888, 893, 872, 284, 845, 903`.
 
+시작이 멈추거나 설정 파일이 비정상적으로 커진 경우 [설정 복구 안내](https://github.com/asparagusThief/poi-plugin-senka-ledger/blob/main/docs/recovery.md)를 참고하세요.
+
 로그 위치는 `APPDATA_PATH/senka-ledger/<계정ID>.jsonl`입니다. JSON은 PC 이전, poi 재설치, 데이터 손상 시 전체 기록을 복원하는 데 사용합니다. 복원하려면 모든 poi를 종료하고 기존 파일을 백업한 다음 JSON의 `journal` 내용을 이 폴더의 `<계정ID>.jsonl`로 저장하세요. 화면에서 가져오기 기능은 아직 없습니다. 일상적인 조회와 분석에는 CSV를 사용할 수 있습니다. token·비밀번호·전체 API 응답은 저장하지 않습니다.
 
 ## 미리 보기

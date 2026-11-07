@@ -10,11 +10,13 @@ function bindPanel(root) {
     const height = Math.max(0, Math.floor(Math.min(bottom, view.innerHeight) - top))
     if (root.style.height !== height + 'px') root.style.height = height + 'px'
   }
-  const resize = new view.ResizeObserver(update)
+  let frame = null
+  const schedule = () => { if (frame === null) frame = view.requestAnimationFrame(() => { frame = null; update() }) }
+  const resize = new view.ResizeObserver(schedule)
   if (host) resize.observe(host)
-  view.addEventListener('resize', update)
+  view.addEventListener('resize', schedule)
   update()
-  return () => { resize.disconnect(); view.removeEventListener('resize', update) }
+  return () => { resize.disconnect(); view.removeEventListener('resize', schedule); if (frame !== null) view.cancelAnimationFrame(frame) }
 }
 function fitNumbers(root) {
   if (!root) return
