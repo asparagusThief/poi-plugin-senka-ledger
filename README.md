@@ -10,14 +10,15 @@ A local senka ledger for **poi 12.0.1+**.
 - Local sortie, practice and expedition rewards, calculated as `Admiral EXP × 7 / 10000`. EO and supported quest rewards appear in the summaries.
 - Unrecorded EXP gains shown separately with a total and possible time intervals, without assigning them to the login day or hour.
 - Ranking snapshots for yourself and positions **1, 5, 20, 100 and 500**, including gaps and changes since the preceding refresh.
-- Paginated details, CSV export, JSON backup and separate journals for each account.
+- Details with previous/next buttons and mouse-wheel paging. Each page fits the window, up to 10 records.
+- Remembered time zone, Admiral names in the account list, CSV export, JSON backup and separate journals for each account.
 - English, Simplified Chinese, Traditional Chinese, Japanese and Korean; works in the main panel and separate windows.
 
 ## Use
 
 1. Install `poi-plugin-senka-ledger` through poi's plugin manager or download the `.tgz` from [GitHub Releases](https://github.com/asparagusThief/poi-plugin-senka-ledger/releases).
 2. Enable the plugin and enter the home port to establish the EXP baseline.
-3. Select an account, month and time zone. Click a date for hourly values, then an hour for details.
+3. Select an account, month and time zone. The time zone is saved for future sessions. Account names are learned from home-port data; unread names use the account ID. Click a date for hourly values, then an hour for details.
 
 Open the ranking list in the game and visit the relevant pages to record ranking scores. Changes compare the immediately preceding **03:00 / 15:00 JST** refresh; missing prior records show `—`. The plugin does not make game requests.
 
@@ -27,7 +28,7 @@ History starts when recording begins. Local rewards use their observed result ti
 
 Supported senka quests: `854, 888, 893, 872, 284, 845, 903`.
 
-Journals are stored in `APPDATA_PATH/senka-ledger/<accountID>.jsonl`. Back up this folder before restoring data. Close all poi instances before replacing a journal. JSON backups contain the original journal text in `journal`; there is no in-app import. Tokens, passwords and complete API responses are not stored.
+Journals are stored in `APPDATA_PATH/senka-ledger/<accountID>.jsonl`. JSON backs up the full history for moving computers, reinstalling poi or recovering damaged data. To restore, close all poi instances and save the backup's `journal` text as `<accountID>.jsonl` in this folder, after backing up the existing file. There is no in-app import. CSV is intended for viewing and analysis. Tokens, passwords and complete API responses are not stored.
 
 ## Preview
 

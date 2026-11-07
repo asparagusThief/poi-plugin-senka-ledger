@@ -30,4 +30,8 @@ test('poi active header uses the package-name ID and an original registered icon
   assert.match(manifest.description, /^A local senka ledger/)
   assert.equal(manifest.poiPlugin.description, manifest.description)
   assert.equal(resources['zh-CN'][manifest.poiPlugin.name], '战果手账')
+  for (const [language, data] of Object.entries(resources)) {
+    assert.ok(data[manifest.description], language + ': missing poi description translation')
+    if (language !== 'en-US') assert.notEqual(data[manifest.description], manifest.description)
+  }
 })

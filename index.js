@@ -9,7 +9,9 @@ const { createPanel } = require('./src/panel')
 const { toCSV } = require('./src/export')
 const { register } = require('./src/icon')
 const { RANKING_PATH } = require('./src/ranking')
-const { resources, namespace } = require('./src/i18n')
+const { resources, namespace, translator } = require('./src/i18n')
+const { Preferences } = require('./src/preferences')
+const { description } = require('./package.json')
 // Register before poi re-reads the manifest and builds the menu icon.
 try { register(require('@fortawesome/fontawesome-svg-core').library) } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }
 try {
@@ -24,15 +26,26 @@ let directory = ''
 let loaded = false
 let poiI18n = null
 let onLanguageChanged = null
+let preferences = new Preferences()
 const subscribers = new Set()
-const snapshot = () => ({ account: adapter.account, accounts: [...new Set([...(journal ? journal.list() : []), ...(adapter.account ? [adapter.account] : [])])], error, directory, language: poiI18n?.language || 'en-US' })
+const snapshot = () => ({ account: adapter.account, accounts: [...new Set([...(journal ? journal.list() : []), ...(adapter.account ? [adapter.account] : [])])], error, directory, language: poiI18n?.language || 'en-US', ...preferences.snapshot() })
 const emit = () => { const value = snapshot(); for (const callback of subscribers) callback(value) }
+function updateDescription() {
+  try {
+    const { getStore, dispatch } = require('views/create-store')
+    const { createPluginChangeStatusAction } = require('views/redux/actions/plugins')
+    if (getStore().plugins.some(plugin => plugin.packageName === namespace)) {
+      dispatch(createPluginChangeStatusAction({ packageName: namespace, option: [{ path: 'description', status: translator(poiI18n?.language)(description) }] }))
+    }
+  } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') console.warn('Senka Ledger: description update failed', e.message) }
+}
 function onResponse(event) {
   try {
     const previousAccount = adapter.account
     const result = decode(adapter, event.detail)
     if (result) for (const input of result.records) journal.append(result.account, input)
-    if (result?.records.length || adapter.account !== previousAccount) emit()
+    const nameChanged = adapter.account ? preferences.rememberName(adapter.account, adapter.nickname) : false
+    if (result?.records.length || adapter.account !== previousAccount || nameChanged) emit()
   } catch (e) { error = e.message; emit() }
 }
 exports.pluginDidLoad = function pluginDidLoad() {
@@ -40,10 +53,11 @@ exports.pluginDidLoad = function pluginDidLoad() {
   const { APPDATA_PATH, isMain, config } = require('views/env')
   if (isMain === false) return
   loaded = true
+  preferences = new Preferences(config)
   try {
     const module = require('views/env-parts/i18next')
     poiI18n = module.default || module
-    onLanguageChanged = () => emit()
+    onLanguageChanged = () => { updateDescription(); emit() }
     poiI18n.on('languageChanged', onLanguageChanged)
   } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }
   // Preserve window preferences when moving from the old short ID to poi's
@@ -77,6 +91,7 @@ exports.pluginWillUnload = function pluginWillUnload() {
 }
 const service = {
   snapshot,
+  setZone(zone) { preferences.setZone(zone); emit() },
   subscribe(callback) {
     subscribers.add(callback)
     exports.pluginDidLoad()

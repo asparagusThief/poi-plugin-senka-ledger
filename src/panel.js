@@ -7,7 +7,8 @@ const { snapshot: rankingSnapshot, ANCHORS } = require('./ranking')
 const { translator, normalize, errorText, battleText } = require('./i18n')
 const { bindPanel, fitNumbers } = require('./layout')
 const { createIcon } = require('./icon')
-const { paginate } = require('./details')
+const { paginate, fitPageSize, bindWheelPaging } = require('./details')
+const { accountLabel } = require('./preferences')
 const style = require('./styles')
 
 const colors = ['rgba(130,150,160,.13)', '#c4e9d8', '#81cdb2', '#36aa8f', '#087e70']
@@ -19,16 +20,18 @@ function createPanel(React, service) {
   const h = React.createElement
   return function SenkaLedgerPanel() {
     const [status, setStatus] = React.useState(service.snapshot())
-    const [zone, setZone] = React.useState('Asia/Tokyo')
+    const zone = status.zone || 'Asia/Tokyo'
     const [month, setMonth] = React.useState(parts(Date.now()).month)
     const [day, setDay] = React.useState(null)
     const [viewAccount, setViewAccount] = React.useState('')
     const [slot, setSlot] = React.useState(null)
     const [detailKind, setDetailKind] = React.useState(null)
     const [detailPage, setDetailPage] = React.useState(0)
+    const [pageSize, setPageSize] = React.useState(10)
     const [exportError, setExportError] = React.useState('')
     const root = React.useRef(null)
     const dialog = React.useRef(null)
+    const pageState = React.useRef(null)
     const titleId = React.useId()
     const language = normalize(status.language)
     const t = translator(language)
@@ -40,7 +43,7 @@ function createPanel(React, service) {
       const view = root.current?.ownerDocument.defaultView
       if (view?.isWindowMode) root.current.ownerDocument.title = t('Senka Ledger')
     }, [language])
-    React.useEffect(() => {
+    React.useLayoutEffect(() => {
       if (detailKind && !dialog.current.open) dialog.current.showModal()
       else if (!detailKind && dialog.current.open) dialog.current.close()
     }, [detailKind])
@@ -64,7 +67,23 @@ function createPanel(React, service) {
     const selectedStart = selected ? start + (Number(selected.day.slice(-2)) - 1) * DAY : null
     const unknown = stats.unknown.filter(e => !selected || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at)
     const unknownTotal = unknown.reduce((sum, e) => sum + e.amount, 0)
-    const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage)
+    const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage, pageSize)
+    pageState.current = page
+    React.useLayoutEffect(() => {
+      if (!detailKind) return
+      const element = dialog.current
+      const view = element.ownerDocument.defaultView
+      const update = () => setPageSize(fitPageSize(element))
+      const observer = new view.ResizeObserver(update)
+      observer.observe(element)
+      view.addEventListener('resize', update)
+      update()
+      return () => { observer.disconnect(); view.removeEventListener('resize', update) }
+    }, [detailKind, language])
+    React.useEffect(() => {
+      if (!detailKind) return
+      return bindWheelPaging(dialog.current.querySelector('.dialog-body'), () => pageState.current, setDetailPage)
+    }, [detailKind])
     const offset = (new Date(month + '-01T00:00:00Z').getUTCDay() + 6) % 7
     React.useEffect(() => {
       fitNumbers(root.current)
@@ -126,16 +145,18 @@ function createPanel(React, service) {
         h('aside', { className: 'summary-pane' },
           h('div', { className: 'controls' },
             h('label', null, t('account'), h('select', { 'aria-label': t('account'), 'data-control': 'account', value: account, onChange: e => { setViewAccount(e.target.value); back() } },
-              !account && h('option', { value: '' }, t('waiting')), ...status.accounts.map(id => h('option', { key: id, value: id }, id + (id === status.account ? ' · ' + t('current') : ''))))),
+              !account && h('option', { value: '' }, t('waiting')), ...status.accounts.map(id => h('option', { key: id, value: id, title: id }, accountLabel(id, status.accountNames) + (id === status.account ? ' · ' + t('current') : ''))))),
             h('label', null, t('month'), h('select', { 'aria-label': t('month'), 'data-control': 'month', value: month, onChange: e => { setMonth(e.target.value); back() } }, ...allMonths.map(m => h('option', { key: m }, m)))),
-            h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => { setZone(e.target.value); setSlot(null); closeDetails() } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
+            h('label', null, t('timezone'), h('select', { 'aria-label': t('timezone'), 'data-control': 'zone', value: zone, onChange: e => {
+              try { service.setZone(e.target.value); setExportError(''); setSlot(null); closeDetails() } catch (error) { setExportError(error.message) }
+            } }, h('option', { value: 'Asia/Tokyo' }, t('japan')), h('option', { value: 'Asia/Shanghai' }, t('china')))),
             h('button', { disabled: !account, onClick: () => download('csv') }, t('exportCSV')), h('button', { disabled: !account, onClick: () => download('json') }, t('backupJSON'))),
           h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
           h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') },
             h('span', { className: 'unknown-heading card-label' }, t('unknown')),
             h('span', { className: 'unknown-total', 'data-summary': 'unknownTotal' }, t('total'), ' ', h('strong', { className: 'amber value' }, fmt(unknownTotal))),
             h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
-      h('div', { className: 'foot' }, 'v0.2.5'),
+      h('div', { className: 'foot' }, 'v0.2.6'),
       h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
         onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
         detailKind && h(React.Fragment, null,

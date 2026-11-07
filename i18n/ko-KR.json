@@ -82,5 +82,6 @@
   "recordRange": "{{count}}건 중 {{start}}–{{end}}건",
   "recordCount": "{{count}}건의 기록",
   "total": "합계",
-  "rankChange": "이전 갱신 대비"
+  "rankChange": "이전 갱신 대비",
+  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "일별 기록, 시간별 상세와 순위 스냅샷을 제공하는 poi용 로컬 전과 수첩입니다."
 }

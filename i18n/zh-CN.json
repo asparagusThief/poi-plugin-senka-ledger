@@ -82,5 +82,6 @@
   "recordRange": "第 {{start}}–{{end}} 笔，共 {{count}} 笔",
   "recordCount": "{{count}} 笔记录",
   "total": "总计",
-  "rankChange": "较上次刷新"
+  "rankChange": "较上次刷新",
+  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "为 poi 记录本地战果，支持每日历史、每小时明细和排名快照。"
 }

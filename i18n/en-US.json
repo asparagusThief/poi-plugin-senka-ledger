@@ -82,5 +82,6 @@
   "recordRange": "{{start}}–{{end}} of {{count}}",
   "recordCount": "{{count}} records",
   "total": "Total",
-  "rankChange": "Since previous refresh"
+  "rankChange": "Since previous refresh",
+  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "A local senka ledger for poi with daily history, hourly details and ranking snapshots."
 }

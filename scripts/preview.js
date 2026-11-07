@@ -7,7 +7,7 @@ const path = require('path')
 const root = path.resolve(__dirname, '..')
 const runtime = path.resolve(process.argv[2] || '.')
 const output = path.resolve(process.argv[3] || 'preview.html')
-const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'i18n', 'layout', 'icon', 'styles']
+const names = ['time', 'ledger', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'preferences', 'i18n', 'layout', 'icon', 'styles']
 let bundle = names.map(name => `modules['./${name}']=function(module,exports,require){\n${fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')}\n};`).join('\n')
 for (const language of ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) bundle += `\nmodules['../i18n/${language}.json']=function(module){module.exports=${fs.readFileSync(path.join(root, 'i18n', language + '.json'), 'utf8')};};`
 const react = fs.readFileSync(path.join(runtime, 'react.production.min.js'), 'utf8')
@@ -38,17 +38,19 @@ apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-
 state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:10:00'),amount:0.14,exp:200,activity:'practice',mapId:null,node:null,rank:'S',label:'演习 · S'});
 state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:59:59'),amount:0.035,exp:50,activity:'expedition',mapId:null,node:null,rank:null,label:'远征'});
 if(params.has('long'))for(let i=0;i<1050;i++)state.events.push({id:++state.sequence,source:'local',kind:'normal',at:at('2026-11-05T16:00:00')+i*1000,amount:0.07,exp:100,mapId:71,node:4,rank:'S'});
+if(params.has('unknownlong'))for(let i=0;i<8;i++)state.events.push({id:++state.sequence,source:'unknown',kind:'normal',at:at('2026-11-04T08:00:00')+i*60000,from:at('2026-11-04T07:00:00')+i*60000,to:at('2026-11-04T08:00:00')+i*60000,amount:0.035,label:'未定位'});
 if(params.has('stress'))for(const e of state.events)if(e.source==='local'&&e.kind==='normal')e.amount*=100000;
-let language=normalize(params.get('lang')||'zh-CN');const subscribers=new Set();
-const service={snapshot:()=>({account:'12345678',accounts:['12345678'],language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:()=>({state}),export:()=>{doc.body.dataset.exported='yes'}};
+let language=normalize(params.get('lang')||'zh-CN'),zone=localStorage.getItem('senka-preview-zone')||'Asia/Tokyo';const subscribers=new Set();
+const service={snapshot:()=>({account:'12345678',accounts:['12345678'],accountNames:{'12345678':'Sample Admiral'},zone,language}),subscribe:cb=>{subscribers.add(cb);cb(service.snapshot());return()=>subscribers.delete(cb)},entry:()=>({state}),setZone(value){zone=value;localStorage.setItem('senka-preview-zone',value);for(const cb of subscribers)cb(service.snapshot())},export:()=>{doc.body.dataset.exported='yes'}};
 const Panel=require('./panel').createPanel(React,service);
 let doc=document;let popup=null;
+const reactRoot=ReactDOM.createRoot(document.getElementById('app'));
 if(params.has('portal')){
  popup=open('about:blank','senka-ledger-portal','width=600,height=500');if(!popup)throw Error('Popup blocked');
  popup.document.open();popup.document.write(${JSON.stringify(hostHTML)});popup.document.close();popup.isWindowMode=true;doc=popup.document;
- ReactDOM.createRoot(document.getElementById('app')).render(ReactDOM.createPortal(React.createElement(Panel),doc.getElementById('app')));
-}else ReactDOM.createRoot(document.getElementById('app')).render(React.createElement(Panel));
-const api={state,setLanguage(value){language=normalize(value);for(const cb of subscribers)cb(service.snapshot())}};
+}
+const renderPanel=()=>reactRoot.render(popup?ReactDOM.createPortal(React.createElement(Panel),doc.getElementById('app')):React.createElement(Panel));renderPanel();
+const api={state,setLanguage(value){language=normalize(value);for(const cb of subscribers)cb(service.snapshot())},async remount(){reactRoot.render(null);await pause();renderPanel();await pause()}};
 window.senkaPreview=api;doc.defaultView.senkaPreview=api;
 const pause=()=>new Promise(resolve=>setTimeout(resolve,50));const assert=(ok,message)=>{if(!ok)throw Error(message)};
 const select=async(key,value)=>{const el=doc.querySelector('[data-control="'+key+'"]');el.value=value;el.dispatchEvent(new doc.defaultView.Event('change',{bubbles:true}));await pause()};
@@ -62,9 +64,18 @@ async function preview(){
   const report=require('./model').summarize(state,'2026-11');
   for(const d of report.days)assert(doc.querySelector('[data-day="'+d.day+'"] .tile-value').textContent===tileNumber(d.normal),'Daily value mismatch');
   assert(!doc.querySelector('[data-table="unknown"]'),'Unknown list must not fill the main view');
-  assert(doc.querySelector('[data-summary="unknownTotal"] .value').textContent==='9.80','Unrecorded total must be visible before opening details');
+  assert(doc.querySelector('[data-control="account"] option:checked').textContent.startsWith('Sample Admiral'),'Account must display the Admiral name');
+  assert(doc.querySelector('[data-summary="unknownTotal"] .value').textContent===report.unknownTotal.toLocaleString(language,{minimumFractionDigits:2,maximumFractionDigits:2}),'Unrecorded total must be visible before opening details');
   doc.querySelector('[data-action="unknown"]').click();await pause();
-  assert(doc.querySelector('dialog').open&&doc.querySelectorAll('[data-table="unknown"] tbody tr').length===1,'Unknown dialog failed');
+  assert(doc.querySelector('dialog').open&&doc.querySelectorAll('[data-table="unknown"] tbody tr').length>=1,'Unknown dialog failed');
+  if(!doc.querySelector('[data-action="next-page"]').disabled){
+   const first=doc.querySelector('[data-table="unknown"] tbody tr').textContent;
+   doc.querySelector('[data-action="next-page"]').click();await pause();
+   assert(doc.querySelector('[data-table="unknown"] tbody tr').textContent!==first,'Unknown button paging failed');
+   doc.querySelector('[data-action="previous-page"]').click();await pause();
+   const body=doc.querySelector('.dialog-body');body.dispatchEvent(new doc.defaultView.WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}));await pause();
+   assert(doc.querySelector('[data-table="unknown"] tbody tr').textContent!==first,'Unknown wheel paging failed');
+  }
   doc.querySelector('[data-action="close-details"]').click();await pause();
   assert(!doc.querySelector('dialog').open,'Unknown dialog did not close');
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');
@@ -82,7 +93,7 @@ async function preview(){
   doc.querySelector('[data-action="close-details"]').click();await pause();
   doc.querySelector('[data-action="details"]').click();await pause();
   assert(doc.querySelector('dialog').open,'Day detail dialog failed');
-  assert(doc.querySelectorAll('[data-table="details"] tbody tr').length===50,'Day details must be paginated');
+  assert(doc.querySelectorAll('[data-table="details"] tbody tr').length<=10&&!doc.querySelector('[data-action="next-page"]').disabled,'Day details must be paginated to fit the window');
   const firstRow=doc.querySelector('[data-table="details"] tbody tr').textContent;
   doc.querySelector('.dialog-body').scrollTop=doc.querySelector('.dialog-body').scrollHeight;
   doc.querySelector('[data-action="next-page"]').click();await pause();
@@ -90,13 +101,20 @@ async function preview(){
   assert(doc.querySelector('.dialog-body').scrollTop===0,'New pages must start at the top');
   doc.querySelector('[data-action="previous-page"]').click();await pause();
   assert(doc.querySelector('[data-table="details"] tbody tr').textContent===firstRow,'Pagination did not return');
-  const body=doc.querySelector('.dialog-body');body.scrollTop=body.scrollHeight;await pause();
-  assert(body.scrollHeight<=body.clientHeight||body.scrollTop>0,'Details cannot scroll');
+  const body=doc.querySelector('.dialog-body');
+  assert(body.scrollHeight<=body.clientHeight+2,'Detail rows must fit without a long vertical scroll');
+  body.dispatchEvent(new doc.defaultView.WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}));await pause();
+  assert(doc.querySelector('[data-table="details"] tbody tr').textContent!==firstRow,'Wheel did not advance a page');
+  await new Promise(resolve=>setTimeout(resolve,320));body.dispatchEvent(new doc.defaultView.WheelEvent('wheel',{deltaY:-100,bubbles:true,cancelable:true}));await pause();
+  assert(doc.querySelector('[data-table="details"] tbody tr').textContent===firstRow,'Wheel did not return to the preceding page');
   const dialogBox=doc.querySelector('dialog').getBoundingClientRect();
   assert(dialogBox.top>=0&&dialogBox.bottom<=doc.defaultView.innerHeight,'Dialog exceeds window bounds');
   doc.querySelector('[data-action="close-details"]').click();await pause();
   await select('zone','Asia/Shanghai');const shifted=require('./model').summarize(state,'2026-11','Asia/Shanghai');
   assert(doc.querySelector('[data-hour="19"] .tile-value').textContent===tileNumber(shifted.days[3].slots[19]),'Timezone failed');
+  await api.remount();await select('month','2026-11');
+  assert(doc.querySelector('[data-control="zone"]').value==='Asia/Shanghai','Time zone must survive reopening the panel');
+  doc.querySelector('[data-day="2026-11-04"]').click();await pause();
   await select('zone','Asia/Tokyo');doc.querySelector('[data-action="back"]').click();await pause();
   await select('month','2026-10');doc.querySelector('[data-day="2026-10-31"]').click();await pause();
   assert(doc.querySelector('[data-hour="22"] .tile-value').textContent===tileNumber(params.has('stress')?70000:0.7),'Archive failed');
@@ -125,6 +143,7 @@ async function preview(){
  for(const tile of doc.querySelectorAll('.tile'))assert(tile.getBoundingClientRect().height<=70,'Tiles should be compact');
  shell.scrollTop=0;
  if(params.get('view')==='details'){doc.querySelector('[data-action="details"]').click();await pause();assert(doc.querySelector('dialog').open,'Final detail dialog failed')}
+ if(params.get('view')==='unknown'){doc.querySelector('[data-action="unknown"]').click();await pause();assert(doc.querySelector('dialog').open,'Final unknown dialog failed')}
  doc.body.dataset.ready='yes';
 }
 preview().catch(error=>{doc.body.dataset.testError=String(error)});

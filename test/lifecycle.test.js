@@ -10,7 +10,7 @@ const { createRequire } = require('module')
 const { Journal } = require('../src/storage')
 const { summarize } = require('../src/model')
 const filename = path.resolve(__dirname, '..', 'index.js')
-function boot(directory) {
+function boot(directory, config) {
   const listeners = new Map()
   let service = null
   const win = {
@@ -20,7 +20,7 @@ function boot(directory) {
   const localRequire = createRequire(filename)
   const context = { exports: {}, window: win, require(name) {
     if (name === 'react') return {}
-    if (name === 'views/env') return { APPDATA_PATH: directory, isMain: true }
+    if (name === 'views/env') return { APPDATA_PATH: directory, isMain: true, config }
     if (name === './src/panel') return { createPanel: (_, value) => { service = value; return function Panel() {} } }
     return localRequire(name)
   } }
@@ -107,6 +107,41 @@ test('records before opening panel, unloads cleanly and resumes after restart', 
   assert.equal(report.unknownWithinMonth, 7)
   assert.equal(report.days[4].slots[1], 0.7)
 })
+
+test('panel time zone and Admiral names persist through unload and reload and follow account changes', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const prefix = 'plugin.poi-plugin-senka-ledger', names = {}, values = new Map([[`${prefix}.accountNames`, names]])
+  const writes = []
+  const config = { get: key => values.get(key), set(key, value) {
+    values.set(key, value); writes.push([key, value])
+    if (key.startsWith(`${prefix}.accountNames.`)) names[key.split('.').pop()] = value
+  } }
+  const app = boot(directory, config)
+  t.after(() => {
+    app.plugin.pluginWillUnload()
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+  app.plugin.pluginDidLoad()
+  const snapshots = [], unsubscribe = app.service.subscribe(value => snapshots.push(value))
+  t.after(unsubscribe)
+  app.service.setZone('Asia/Shanghai')
+  assert.equal(snapshots.at(-1).zone, 'Asia/Shanghai')
+  const time = Date.parse('2026-11-07T10:00:00+09:00')
+  const port = (id, name, at) => ({ path: '/kcsapi/api_port/port', time: at, body: { api_basic: { api_member_id: id, api_nickname: name, api_experience: 100000 } } })
+  app.send(port(123, '雪風提督', time))
+  app.send(port(123, '雪風提督', time + 1000))
+  assert.equal(snapshots.at(-1).accountNames['123'], '雪風提督')
+  assert.equal(writes.filter(([key]) => key === `${prefix}.accountNames.123`).length, 1)
+  app.send(port(456, '別の提督', time + 2000))
+  assert.equal(snapshots.at(-1).accountNames['123'], '雪風提督')
+  assert.equal(snapshots.at(-1).accountNames['456'], '別の提督')
+  assert.ok(!fs.readFileSync(path.join(directory, 'senka-ledger', '123.jsonl'), 'utf8').includes('雪風提督'))
+  app.plugin.pluginWillUnload()
+  app.plugin.pluginDidLoad()
+  assert.equal(app.service.snapshot().zone, 'Asia/Shanghai')
+  assert.equal(app.service.snapshot().accountNames['123'], '雪風提督')
+})
 test('poi integration registers original icon, follows language changes and migrates old window preferences', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
   const listeners = new Map()
@@ -118,6 +153,8 @@ test('poi integration registers original icon, follows language changes and migr
   const config = { get: key => values.get(key), set: (key, value) => values.set(key, value) }
   let icon = null
   let panelService = null
+  const namespace = 'poi-plugin-senka-ledger'
+  const pluginRows = [{ packageName: namespace, description: 'Initial' }, { packageName: 'poi-plugin-other', description: 'Other' }]
   const localRequire = createRequire(filename)
   const context = { exports: {}, window: {
     addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name)
@@ -126,6 +163,11 @@ test('poi integration registers original icon, follows language changes and migr
     if (name === '@fortawesome/fontawesome-svg-core') return { library: { add: definition => { icon = definition } } }
     if (name === 'views/env') return { APPDATA_PATH: directory, isMain: true, config }
     if (name === 'views/env-parts/i18next') return { default: i18n }
+    if (name === 'views/create-store') return { getStore: () => ({ plugins: pluginRows }), dispatch: action => {
+      const target = pluginRows.find(plugin => plugin.packageName === action.payload.packageName)
+      for (const option of action.payload.option) target[option.path] = option.status
+    } }
+    if (name === 'views/redux/actions/plugins') return { createPluginChangeStatusAction: payload => ({ payload }) }
     if (name === './src/panel') return { createPanel: (_, service) => { panelService = service; return function Panel() {} } }
     return localRequire(name)
   } }
@@ -139,6 +181,11 @@ test('poi integration registers original icon, follows language changes and migr
   assert.deepEqual(values.get('plugin.poi-plugin-senka-ledger'), { bounds: { width: 600, height: 500 } })
   i18n.language = 'en-US'; i18n.emit('languageChanged', 'en-US')
   assert.equal(changes.at(-1).language, 'en-US')
+  const manifest = require('../package.json')
+  assert.equal(pluginRows[0].description, manifest.description)
+  i18n.language = 'ja-JP'; i18n.emit('languageChanged', 'ja-JP')
+  assert.equal(pluginRows[0].description, bundles.get('ja-JP:' + namespace)[manifest.description])
+  assert.equal(pluginRows[1].description, 'Other')
   unsubscribe(); context.exports.pluginWillUnload()
   assert.equal(i18n.listenerCount('languageChanged'), 0)
   assert.equal(listeners.size, 0)
