@@ -1,7 +1,7 @@
 'use strict'
 
 // node scripts/preview.js <React 18 UMD directory> <output.html>
-// Query options: lang=en-US, view=day|details, portal=1, check=1, stress=1, long=1.
+// Query options: lang=en-US, view=day|details, portal=1, check=1, stress=1, long=1, hostinputs=1.
 const fs = require('fs')
 const path = require('path')
 const root = path.resolve(__dirname, '..')
@@ -20,6 +20,7 @@ const Buffer={byteLength:value=>new TextEncoder().encode(value).length};const se
 ${bundle}
 function require(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;modules[id](m,m.exports,require);return m.exports;}
 const params=new URLSearchParams(location.search);
+const hostInputStyle=params.has('hostinputs')?'input{display:inline-block!important}':'';
 const {createLedger,apply:applyLedger}=require('./ledger');const {translator,normalize}=require('./i18n');
 const records=[];const apply=(state,input)=>{records.push(input);applyLedger(state,input)};
 const state=createLedger();const at=s=>Date.parse(s+'+09:00');let total=10000000;
@@ -52,6 +53,7 @@ if(params.has('portal')){
  popup=open('about:blank','senka-ledger-portal','width=600,height=500');if(!popup)throw Error('Popup blocked');
  popup.document.open();popup.document.write(${JSON.stringify(hostHTML)});popup.document.close();popup.isWindowMode=true;doc=popup.document;
 }
+if(hostInputStyle){const sheet=doc.createElement('style');sheet.textContent=hostInputStyle;doc.head.appendChild(sheet)}
 const renderPanel=()=>reactRoot.render(popup?ReactDOM.createPortal(React.createElement(Panel),doc.getElementById('app')):React.createElement(Panel));renderPanel();
 const api={state,setLanguage(value){language=normalize(value);for(const cb of subscribers)cb(service.snapshot())},async remount(){reactRoot.render(null);await pause();renderPanel();await pause()}};
 window.senkaPreview=api;doc.defaultView.senkaPreview=api;
@@ -62,6 +64,9 @@ const tileNumber=n=>n.toLocaleString(language,{useGrouping:false,minimumFraction
 async function preview(){
  await pause();await select('month','2026-11');
  if(params.has('check')){
+  const assertHiddenInput=()=>{const input=doc.querySelector('[data-control="import-file"]');assert(doc.defaultView.getComputedStyle(input).display==='none'&&input.getClientRects().length===0&&input.tabIndex===-1,'Native file input must remain hidden under host form styles')};
+  assertHiddenInput();doc.querySelector('[data-action="data-menu"]').click();await pause();assertHiddenInput();
+  assert(doc.querySelector('[data-action="import-json"]').textContent===translator(language)('importJSON'),'Import menu must use the plugin language');doc.querySelector('.data-menu').open=false;
   assert(doc.querySelector('.sl').dataset.view==='month'&&!doc.querySelector('.hours'),'Initial monthly view failed');
   assert(doc.querySelectorAll('[data-day]').length===30,'Monthly date count failed');
   const report=require('./model').summarize(state,'2026-11');
