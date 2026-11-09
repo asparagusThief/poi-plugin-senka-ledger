@@ -91,6 +91,7 @@ async function preview(){
    assert(doc.querySelector('dialog').open&&doc.querySelector('[data-table="bonus"][data-bonus-kind="'+kind+'"]'),'Bonus detail dialog failed for '+kind);
    assert(doc.querySelectorAll('[data-table="bonus"] tbody tr').length>=1,'Bonus detail rows missing for '+kind);
    assert(!doc.querySelector('[data-table="bonus"] .empty'),'Bonus detail unexpectedly empty for '+kind);
+   assert(doc.querySelector('[data-table="bonus"]').textContent.includes(kind==='eo'?'5-5':'854'),'Bonus source metadata missing for '+kind);
    doc.querySelector('[data-action="close-details"]').click();await pause();
   }
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');

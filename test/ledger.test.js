@@ -99,6 +99,15 @@ test('EO maps inferred before or after a direct reward never count twice', () =>
     assert.equal(report.unknownWithinMonth, 0)
   }
 })
+test('local bonus events retain map and quest metadata for detail views after replay', () => {
+  const state = createLedger()
+  apply(state, bonus('2026-11-05T08:00:00', 75, 15))
+  apply(state, { ...bonus('2026-11-05T09:00:00', 350, null), kind: 'quest', questId: 854, key: 'quest:854', label: '任务奖励' })
+  assert.equal(state.events[0].mapId, 15)
+  assert.equal(state.events[0].questId, null)
+  assert.equal(state.events[1].mapId, null)
+  assert.equal(state.events[1].questId, 854)
+})
 test('legacy inferred EO remains replayable but is excluded from unknown totals and month list', () => {
   const state = createLedger()
   apply(state, maps('2026-11-05T08:00:00', [15, 25]))

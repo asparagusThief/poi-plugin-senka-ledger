@@ -76,7 +76,7 @@ function apply(state, input) {
         }
         return
       }
-      add(state, { source: 'local', kind: 'eo', amount: input.amount, at, label: input.label })
+      add(state, { source: 'local', kind: 'eo', amount: input.amount, at, label: input.label, mapId: input.mapId, questId: input.questId })
       seen[input.mapId] = state.sequence
     } else {
       if (input.kind === 'eo') {
@@ -88,13 +88,13 @@ function apply(state, input) {
         }
         const prior = state.events.find(e => e.kind === 'eo' && e.source === 'unknown' && e.amount === input.amount && parts(e.at).month === month)
         if (prior) {
-          Object.assign(prior, { source: 'local', at, label: input.label })
+          Object.assign(prior, { source: 'local', at, label: input.label, mapId: input.mapId, questId: input.questId })
           delete prior.from
           delete prior.to
           return
         }
       }
-      add(state, { source: 'local', kind: input.kind, amount: input.amount, at, label: input.label })
+      add(state, { source: 'local', kind: input.kind, amount: input.amount, at, label: input.label, mapId: input.mapId, questId: input.questId })
       if (input.kind === 'eo') (state.unlocatedEO[month] ||= []).push({ amount: input.amount, id: state.sequence })
     }
   } else if (input.type === 'maps') {

@@ -61,3 +61,16 @@ test('ranking snapshots survive restart alongside older experience records', t =
   assert.equal(restarted.load('123').state.rankingHistory[0].entries[0].score, 3200)
   assert.equal(summarize(restarted.load('123').state, '2026-11').total, 0)
 })
+
+test('EO and quest source metadata survive a journal restart', t => {
+  const directory = fixture()
+  const journal = new Journal(directory)
+  journal.append('123', { v: 1, type: 'bonus', at: first.at, kind: 'eo', amount: 75, mapId: 15, questId: null, key: 'eo:2026-11:15', label: '1-5 · EO 奖励' })
+  journal.append('123', { v: 1, type: 'bonus', at: first.at + 1000, kind: 'quest', amount: 350, mapId: null, questId: 854, key: 'quest:2026:2:854', label: '任务 854' })
+  journal.close()
+  const restarted = new Journal(directory)
+  t.after(() => { restarted.close(); cleanup(directory) })
+  const events = restarted.load('123').state.events
+  assert.equal(events.find(event => event.kind === 'eo').mapId, 15)
+  assert.equal(events.find(event => event.kind === 'quest').questId, 854)
+})
