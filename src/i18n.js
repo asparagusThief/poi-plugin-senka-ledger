@@ -41,4 +41,11 @@ function battleText(event, t) {
   const rank = event.rank || legacy?.[3]
   return `${map}${node != null ? ' · ' + t('node', { node }) : ''}${rank ? ' · ' + rank : ''}`
 }
-module.exports = { resources, namespace, normalize, translator, errorText, battleText }
+function bonusText(event, t) {
+  if (event.kind === 'eo') {
+    const map = event.mapId == null ? t('unknownMap') : `${Math.floor(event.mapId / 10)}-${event.mapId % 10}`
+    return `${map} · ${t('eoKind')}`
+  }
+  return `${t('questKind')}${event.questId == null ? '' : ' #' + event.questId}`
+}
+module.exports = { resources, namespace, normalize, translator, errorText, battleText, bonusText }

@@ -94,5 +94,7 @@
   "recordCount": "{{count}} 筆記錄",
   "total": "總計",
   "rankChange": "較上次更新",
-  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "為 poi 記錄本機戰果，支援每日歷史、每小時明細與排名快照。"
+  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "為 poi 記錄本機戰果，支援每日歷史、每小時明細與排名快照。",
+  "bonusDetail": "{{scope}} · {{kind}}明細",
+  "viewBonus": "查看{{kind}}明細"
 }

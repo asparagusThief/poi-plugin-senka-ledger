@@ -94,5 +94,7 @@
   "recordCount": "{{count}} 件の記録",
   "total": "合計",
   "rankChange": "前回更新との差",
-  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "日別履歴・時間別明細・ランキングの記録に対応した、poi 用のローカル戦果手帳。"
+  "A local senka ledger for poi with daily history, hourly details and ranking snapshots.": "日別履歴・時間別明細・ランキングの記録に対応した、poi 用のローカル戦果手帳。",
+  "bonusDetail": "{{scope}} · {{kind}}の明細",
+  "viewBonus": "{{kind}}の明細を表示"
 }

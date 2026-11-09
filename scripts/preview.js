@@ -86,6 +86,13 @@ async function preview(){
   }
   doc.querySelector('[data-action="close-details"]').click();await pause();
   assert(!doc.querySelector('dialog').open,'Unknown dialog did not close');
+  for(const kind of ['eo','quest']){
+   doc.querySelector('[data-action="bonus-'+kind+'"]').click();await pause();
+   assert(doc.querySelector('dialog').open&&doc.querySelector('[data-table="bonus"][data-bonus-kind="'+kind+'"]'),'Bonus detail dialog failed for '+kind);
+   assert(doc.querySelectorAll('[data-table="bonus"] tbody tr').length>=1,'Bonus detail rows missing for '+kind);
+   assert(!doc.querySelector('[data-table="bonus"] .empty'),'Bonus detail unexpectedly empty for '+kind);
+   doc.querySelector('[data-action="close-details"]').click();await pause();
+  }
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');
   assert(doc.querySelector('[data-table="ranking"]').textContent.includes('#250'),'Ranking score missing');
   assert(doc.querySelector('[data-ranking-change="self"]').textContent.includes('+200.00'),'Previous-refresh change missing');

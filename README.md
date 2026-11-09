@@ -7,7 +7,7 @@ A local senka history plugin for **poi 12.0.1+**.
 ## Features
 
 - Browse monthly history, daily values and hourly details.
-- Track sortie, practice and expedition EXP, with EO and quest rewards in the summary.
+- Track sortie, practice and expedition EXP, with EO and quest rewards in the summary. Click the EO or quest total to view its reward details.
 - View unrecorded EXP gains separately, with totals and possible time intervals.
 - Compare your ranking score with ranks **1, 5, 20, 100 and 500**, and with the previous ranking refresh.
 - Keep separate account histories, save your time zone, and back up or restore records.

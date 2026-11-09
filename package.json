@@ -1,6 +1,6 @@
 {
   "name": "poi-plugin-senka-ledger",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "A local senka ledger for poi with daily history, hourly details and ranking snapshots.",
   "main": "index.js",
   "license": "MIT",
@@ -13,12 +13,25 @@
   "bugs": {
     "url": "https://github.com/asparagusThief/poi-plugin-senka-ledger/issues"
   },
-  "keywords": ["poi", "poi-plugin", "kancolle", "senka", "战果"],
+  "keywords": [
+    "poi",
+    "poi-plugin",
+    "kancolle",
+    "senka",
+    "战果"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "files": ["index.js", "src", "assets", "i18n", "README*.md", "LICENSE"],
+  "files": [
+    "index.js",
+    "src",
+    "assets",
+    "i18n",
+    "README*.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test test/*.test.js",
     "check": "node scripts/check.js",
@@ -30,7 +43,10 @@
     "title": "Senka Ledger",
     "description": "A local senka ledger for poi with daily history, hourly details and ranking snapshots.",
     "i18nDir": "i18n",
-    "icon": ["fas", "senka-ledger"],
+    "icon": [
+      "fas",
+      "senka-ledger"
+    ],
     "earliestCompatibleMain": "12.0.1",
     "priority": 98
   }

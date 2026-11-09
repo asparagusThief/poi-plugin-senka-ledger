@@ -1,7 +1,7 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { resources, translator, normalize, errorText, battleText } = require('../src/i18n')
+const { resources, translator, normalize, errorText, battleText, bonusText } = require('../src/i18n')
 const manifest = require('../package.json')
 const { definition } = require('../src/icon')
 test('all five languages have complete keys and matching interpolation variables', () => {
@@ -23,6 +23,8 @@ test('follows locale variants, translates legacy details, errors and all display
   assert.equal(t('shown', { count: 350, limit: 300 }), '350 records · latest 300 shown')
   assert.equal(errorText('另一个 poi 实例正在记录战果，请关闭另一实例', t), resources['en-US'].locked)
   assert.equal(errorText('记录第 4 行异常：末行写入未完成。已保留原文件并暂停写入。', t), t('corrupt', { line: 4 }))
+  assert.equal(bonusText({ kind: 'eo', mapId: 55 }, t), '5-5 · EO')
+  assert.equal(bonusText({ kind: 'quest', questId: 854 }, t), 'Quest #854')
 })
 test('poi active header uses the package-name ID and an original registered icon', () => {
   assert.equal(manifest.poiPlugin.id, manifest.name)

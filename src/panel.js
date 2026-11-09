@@ -4,7 +4,7 @@ const { parts, formatTime, monthBounds, DAY } = require('./time')
 const { months, summarize } = require('./model')
 const { createLedger } = require('./ledger')
 const { snapshot: rankingSnapshot, ANCHORS } = require('./ranking')
-const { translator, normalize, errorText, battleText } = require('./i18n')
+const { translator, normalize, errorText, battleText, bonusText } = require('./i18n')
 const { bindPanel, fitNumbers } = require('./layout')
 const { createIcon } = require('./icon')
 const { paginate, fitPageSize, bindWheelPaging } = require('./details')
@@ -88,11 +88,17 @@ function createPanel(React, service) {
     const maxDay = Math.max(0, ...stats.days.map(d => d.normal))
     const maxHour = selected ? Math.max(0, ...selected.slots) : 0
     const timeline = React.useMemo(() => selected ? selected.events.filter(e => slot === null || parts(e.at, zone).hour === slot).slice().sort((a, b) => b.at - a.at || b.id - a.id) : [], [selected, slot, zone])
-    const [start] = monthBounds(month, zone)
+    const [start, end] = monthBounds(month, zone)
     const selectedStart = selected ? start + (Number(selected.day.slice(-2)) - 1) * DAY : null
     const unknown = React.useMemo(() => stats.unknown.filter(e => selectedStart === null || (e.from < selectedStart + DAY && e.to >= selectedStart)).slice().sort((a, b) => b.at - a.at), [stats, selectedStart])
     const unknownTotal = unknown.reduce((sum, e) => sum + e.amount, 0)
-    const page = paginate(detailKind === 'unknown' ? unknown : timeline, detailPage, pageSize)
+    const bonusTimeline = React.useMemo(() => state.events
+      .filter(e => e.source === 'local' && (e.kind === 'eo' || e.kind === 'quest'))
+      .filter(e => e.at >= (selectedStart ?? start) && e.at < (selectedStart === null ? end : selectedStart + DAY))
+      .filter(e => detailKind === 'eo' || detailKind === 'quest' ? e.kind === detailKind : true)
+      .slice().sort((a, b) => b.at - a.at || b.id - a.id), [state, status, start, end, selectedStart, detailKind])
+    const detailRecords = detailKind === 'unknown' ? unknown : detailKind === 'normal' ? timeline : bonusTimeline
+    const page = paginate(detailRecords, detailPage, pageSize)
     pageState.current = page
     React.useEffect(() => {
       if (!detailKind) return
@@ -125,7 +131,11 @@ function createPanel(React, service) {
       observer.observe(root.current)
       return () => { observer.disconnect(); if (frame !== null) view.cancelAnimationFrame(frame) }
     }, [month, day, zone, language, status, account])
-    const card = (key, value, accent = false) => h('div', { className: 'card', 'data-summary': key }, h('div', { className: 'muted card-label' }, t(key)), h('div', { className: `value${accent ? ' accent' : ''}` }, fmt(value)))
+    const card = (key, value, accent = false, action = null) => {
+      const props = { className: `card${action ? ' card-action' : ''}`, 'data-summary': key }
+      if (action) { props.onClick = () => openDetails(action); props['data-action'] = `bonus-${action}`; props['aria-label'] = t('viewBonus', { kind: t(key) }) }
+      return h(action ? 'button' : 'div', props, h('div', { className: 'muted card-label' }, t(key)), h('div', { className: `value${accent ? ' accent' : ''}` }, fmt(value)))
+    }
     const th = labels => h('thead', null, h('tr', null, ...labels.map(key => h('th', { key }, t(key)))))
     const stamp = at => {
       const text = formatTime(at, zone)
@@ -155,7 +165,7 @@ function createPanel(React, service) {
     const storageFailure = status.error || entry?.error
     const failure = storageFailure || exportError
     const changeText = value => value === null ? '—' : `${value > 0 ? '+' : ''}${fmt(value)}`
-    const detailsTitle = detailKind === 'unknown' ? t('unknown') : `${selected?.day || month} · ${slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })}`
+    const detailsTitle = detailKind === 'unknown' ? t('unknown') : detailKind === 'eo' || detailKind === 'quest' ? t('bonusDetail', { scope: selected?.day || month, kind: t(detailKind) }) : `${selected?.day || month} · ${slot === null ? t('dayDetail') : t('hourDetail', { hour: `${String(slot).padStart(2, '0')}:00–${String(slot + 1).padStart(2, '0')}:00` })}`
     const rankingPanel = h('details', { className: 'ranking', 'aria-label': t('rankTitle') },
       h('summary', { className: 'rank-summary' }, h('h3', null, t('rankTitle')), h('span', { className: 'rank-own' },
         own ? `${t('rankSelf')} #${own.rank} · ${fmt(own.score)}` : t('rankPending'),
@@ -207,23 +217,24 @@ function createPanel(React, service) {
                 h('button', { 'data-action': 'import-json', disabled: importing, onClick: () => { dataMenu.current.open = false; fileInput.current.click() } }, t('importJSON')))),
             h('input', { type: 'file', accept: '.json,application/json', hidden: true, 'aria-hidden': true, tabIndex: -1, ref: fileInput, 'data-control': 'import-file', onChange: readJSON })),
           (importing || importResult) && h('p', { className: 'data-message', role: 'status' }, importing ? t('importing') : t('importComplete', { account: accountLabel(importResult.account, status.accountNames), added: importResult.added, skipped: importResult.skipped })),
-          h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo), card('quest', totals.quest)),
+          h('div', { className: 'cards' }, card(selected ? 'dayTotal' : 'monthTotal', totals.total, true), card('normal', totals.normal), card('eo', totals.eo, false, 'eo'), card('quest', totals.quest, false, 'quest')),
           h('button', { className: 'unknown-trigger', 'data-action': 'unknown', onClick: () => openDetails('unknown') },
             h('span', { className: 'unknown-heading card-label' }, t('unknown')),
             h('span', { className: 'unknown-total', 'data-summary': 'unknownTotal' }, t('total'), ' ', h('strong', { className: 'amber value' }, fmt(unknownTotal))),
             h('span', { className: 'muted' }, t('recordCount', { count: unknown.length }))))),
-      h('div', { className: 'foot' }, 'v0.2.9'),
+      h('div', { className: 'foot' }, 'v0.3.0'),
       h('dialog', { ref: dialog, className: 'detail-dialog', 'aria-labelledby': titleId, 'data-dialog': 'details', onClose: closeDetails, onCancel: closeDetails,
         onClick: event => { const box = event.currentTarget.getBoundingClientRect(); if (event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) closeDetails() } },
         detailKind && h(React.Fragment, null,
           h('header', { className: 'dialog-header' }, h('h3', { id: titleId }, detailsTitle), h('button', { 'data-action': 'close-details', onClick: closeDetails }, t('close'))),
           h('div', { className: 'dialog-toolbar' }, h('span', null, t('recordRange', { start: page.start, end: page.end, count: page.count })),
             detailKind === 'normal' && slot !== null && h('button', { 'data-action': 'all', onClick: () => { setSlot(null); setDetailPage(0) } }, t('viewAll'))),
-          h('div', { className: 'dialog-body' }, h('table', { className: detailKind === 'unknown' ? 'unknown-table' : 'details-table', 'data-table': detailKind === 'unknown' ? 'unknown' : 'details' },
-            th(detailKind === 'unknown' ? ['interval', 'detected', 'senka'] : ['time', 'experience', 'senka', 'map']), h('tbody', null,
+          h('div', { className: 'dialog-body' }, h('table', { className: detailKind === 'unknown' ? 'unknown-table' : detailKind === 'eo' || detailKind === 'quest' ? 'bonus-table' : 'details-table', 'data-table': detailKind === 'unknown' ? 'unknown' : detailKind === 'eo' || detailKind === 'quest' ? 'bonus' : 'details', 'data-bonus-kind': detailKind === 'eo' || detailKind === 'quest' ? detailKind : undefined },
+            th(detailKind === 'unknown' ? ['interval', 'detected', 'senka'] : detailKind === 'eo' || detailKind === 'quest' ? ['time', 'senka', 'source'] : ['time', 'experience', 'senka', 'map']), h('tbody', null,
               ...page.items.map(e => detailKind === 'unknown' ? h('tr', { key: e.id }, h('td', null, stamp(e.from), '→', stamp(e.to)), h('td', null, stamp(e.at)), h('td', { className: 'amber' }, fmt(e.amount))) :
+                detailKind === 'eo' || detailKind === 'quest' ? h('tr', { key: e.id }, h('td', null, stamp(e.at)), h('td', { className: 'amber' }, fmt(e.amount)), h('td', null, bonusText(e, t))) :
                 h('tr', { key: e.id }, h('td', null, formatTime(e.at, zone).slice(11)), h('td', null, formats.integer.format(e.exp)), h('td', null, fmt(e.amount)), h('td', null, battleText(e, t)))),
-              !page.items.length && h('tr', null, h('td', { colSpan: detailKind === 'unknown' ? 3 : 4, className: 'empty' }, t('empty')))))),
+              !page.items.length && h('tr', null, h('td', { colSpan: detailKind === 'unknown' ? 3 : detailKind === 'eo' || detailKind === 'quest' ? 3 : 4, className: 'empty' }, t('empty')))))),
           h('footer', { className: 'dialog-footer' }, h('button', { 'data-action': 'previous-page', disabled: page.page === 0, onClick: () => setDetailPage(page.page - 1) }, t('previousPage')),
             h('span', null, t('page', { page: page.page + 1, pages: page.pages })), h('button', { 'data-action': 'next-page', disabled: page.page === page.pages - 1, onClick: () => setDetailPage(page.page + 1) }, t('nextPage')))))))
   }
