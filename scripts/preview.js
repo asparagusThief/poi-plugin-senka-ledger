@@ -35,6 +35,8 @@ for(let d=1;d<=5;d++){
 }
 apply(state,{v:1,type:'bonus',kind:'eo',at:at('2026-11-04T20:12:32'),amount:200,mapId:55,questId:null,key:'eo:2026-11:55',label:'5-5 · EO 奖励'});
 apply(state,{v:1,type:'bonus',kind:'quest',at:at('2026-11-05T16:22:30'),amount:350,mapId:null,questId:854,key:'quest:2026:2:854',label:'Z作战前段 · 任务 854'});
+const yearlyAdapter=require('./adapter').createAdapter();yearlyAdapter.account='12345678';
+apply(state,require('./adapter').decode(yearlyAdapter,{path:'/kcsapi/api_req_quest/clearitemget',time:at('2026-11-16T20:00:00'),body:{},postBody:{api_quest_id:'948'}}).records[0]);
 apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T03:30:00'),period:at('2026-11-05T03:00:00'),entries:[[1,8800],[5,8300],[20,7000],[100,4500],[300,3000],[500,2700]].map(([rank,score])=>({rank,score,self:rank===300}))});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800]].map(([rank,score])=>({rank,score,self:rank===250}))});
@@ -92,6 +94,7 @@ async function preview(){
    assert(doc.querySelectorAll('[data-table="bonus"] tbody tr').length>=1,'Bonus detail rows missing for '+kind);
    assert(!doc.querySelector('[data-table="bonus"] .empty'),'Bonus detail unexpectedly empty for '+kind);
    assert(doc.querySelector('[data-table="bonus"]').textContent.includes(kind==='eo'?'5-5':'854'),'Bonus source metadata missing for '+kind);
+   if(kind==='quest')assert(doc.querySelector('[data-table="bonus"]').textContent.includes('948')&&doc.querySelector('[data-table="bonus"]').textContent.includes('600.00'),'By10 reward must be visible in quest details');
    doc.querySelector('[data-action="close-details"]').click();await pause();
   }
   assert(!doc.querySelector('.legend')&&!doc.querySelector('.swatch'),'Legend must be absent');

@@ -70,12 +70,15 @@ function decode(adapter, detail) {
   if (path === '/kcsapi/api_req_quest/clearitemget') {
     const id = number(postBody.api_quest_id)
     if (Object.hasOwn(QUESTS, id)) {
-      const [amount, label] = QUESTS[id]
+      const [amount, label, yearlyMonth] = QUESTS[id]
       const date = new Date(at + 9 * 3600000 - 5 * 3600000)
       const quarter = Math.floor((date.getUTCMonth() + 10) / 3)
-      const cycleYear = date.getUTCMonth() < 2 ? date.getUTCFullYear() - 1 : date.getUTCFullYear()
+      const resetMonth = yearlyMonth || 3
+      const cycleYear = date.getUTCMonth() + 1 < resetMonth ? date.getUTCFullYear() - 1 : date.getUTCFullYear()
+      // Keep existing quarterly keys compatible with previously saved journals.
+      const key = yearlyMonth ? `quest:yearly:${cycleYear}:${yearlyMonth}:${id}` : `quest:${cycleYear}:${quarter % 4}:${id}`
       push({ type: 'bonus', kind: 'quest', amount, questId: id, mapId: null,
-        key: `quest:${cycleYear}:${quarter % 4}:${id}`, label: `${label} · 任务 ${id}` })
+        key, label: `${label} · 任务 ${id}` })
     }
   }
   return { account: adapter.account, records }
