@@ -36,7 +36,9 @@ Import merges records into the account identified by the backup, skips duplicate
 
 ## About the records
 
-History starts when recording begins. Normal senka is calculated as `Admiral EXP × 7 / 10000`; EO and supported quests appear in the summary. Supported quest IDs: `854, 888, 893, 872, 284, 845, 903, 947, 948`. Tasks 947 (By9, +480) and 948 (By10, +600) reset annually in June.
+History starts when recording begins. Normal senka is calculated as `Admiral EXP × 7 / 10000`; EO and supported quests appear in the summary. Built-in quest IDs: `854, 888, 893, 872, 284, 845, 903, 947, 948`. Tasks 947 (By9, +480) and 948 (By10, +600) reset annually in June.
+
+Quests outside the built-in list are also recorded when their reward response includes valid ranking points. Recognized tasks keep their preset rewards and reset cycles. Other quests are recorded per successful claim; repeated copies of the same response are counted once.
 
 Unrecorded EXP gains retain their possible time intervals instead of being assigned to the login time. Intervals spanning days or months can appear in several views; do not add those totals together. Activity totals exclude official ranking carryover and month-end adjustments.
 

@@ -165,6 +165,32 @@ test('JSON import notifies panels, selects the backup account and keeps live rec
   assert.equal(summarize(app.service.entry('123').state, '2026-11').normal, 0.7)
 })
 
+test('unknown task reward responses notify panels and keep subsequent claims recordable', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
+  const app = boot(directory)
+  t.after(() => {
+    app.plugin.pluginWillUnload()
+    if (path.dirname(directory) !== fs.realpathSync(os.tmpdir()) || !path.basename(directory).startsWith('senka-lifecycle-')) throw Error('Unexpected test directory')
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
+  app.plugin.pluginDidLoad()
+  const time = Date.parse('2026-11-17T20:00:00+09:00')
+  app.send({ path: '/kcsapi/api_port/port', time, body: { api_basic: { api_member_id: 123, api_experience: 100000 } } })
+  const updates = [], unsubscribe = app.service.subscribe(value => updates.push(value))
+  t.after(unsubscribe)
+  const response = { path: '/kcsapi/api_req_quest/clearitemget', time, body: { api_bounus: [{ api_type: 18, api_count: 800, api_item: null }] }, postBody: { api_quest_id: '949' } }
+  const before = updates.length
+  app.send(response)
+  assert.ok(updates.length > before)
+  app.send(response)
+  app.send({ ...response, time: time + 86400000 })
+  const state = app.service.entry('123').state
+  assert.equal(state.events.filter(event => event.kind === 'quest').length, 2)
+  assert.equal(summarize(state, '2026-11').quest, 1600)
+  assert.equal(summarize(state, '2026-11').normal, 0)
+  assert.equal(summarize(state, '2026-11').unknownTotal, 0)
+})
+
 test('poi integration registers original icon, follows language changes and migrates old window preferences', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'senka-lifecycle-'))
   const listeners = new Map()

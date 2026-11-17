@@ -3,6 +3,7 @@
 const { EO, QUESTS } = require('./ledger')
 const { parts } = require('./time')
 const { RANKING_PATH, createRankingReader, readRanking } = require('./ranking')
+const { questReward } = require('./quest-rewards')
 const number = value => {
   if (!['number', 'string'].includes(typeof value) || String(value).trim() === '') return null
   const n = Number(value)
@@ -16,7 +17,8 @@ function createAdapter() {
 }
 // Read only documented, relevant fields. Tokens and complete API bodies never enter the journal.
 function decode(adapter, detail) {
-  const { path, body = {}, postBody = {}, time: at } = detail || {}
+  const { path, body: responseBody, postBody = {}, time: at } = detail || {}
+  const body = responseBody ?? {}
   if (!Number.isSafeInteger(at) || at < 0) return null
   const basic = path === '/kcsapi/api_port/port' || path === '/kcsapi/api_get_member/require_info' ? body.api_basic :
     path === '/kcsapi/api_get_member/basic' ? body : null
@@ -79,6 +81,12 @@ function decode(adapter, detail) {
       const key = yearlyMonth ? `quest:yearly:${cycleYear}:${yearlyMonth}:${id}` : `quest:${cycleYear}:${quarter % 4}:${id}`
       push({ type: 'bonus', kind: 'quest', amount, questId: id, mapId: null,
         key, label: `${label} · 任务 ${id}` })
+    } else if (id !== null && id > 0) {
+      const amount = questReward(body)
+      if (amount !== null) push({ type: 'bonus', kind: 'quest', amount, questId: id, mapId: null,
+        // Unknown tasks may repeat on any schedule. Deduplicate the same
+        // response without imposing the quarterly cycle of the known table.
+        key: `quest:response:${id}:${at}`, label: `任务 ${id} · 领奖奖励` })
     }
   }
   return { account: adapter.account, records }

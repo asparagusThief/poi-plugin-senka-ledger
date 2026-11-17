@@ -7,7 +7,7 @@ const path = require('path')
 const root = path.resolve(__dirname, '..')
 const runtime = path.resolve(process.argv[2] || '.')
 const output = path.resolve(process.argv[3] || 'preview.html')
-const names = ['time', 'ledger', 'backup', 'adapter', 'model', 'export', 'ranking', 'panel', 'details', 'preferences', 'i18n', 'layout', 'icon', 'styles']
+const names = ['time', 'ledger', 'backup', 'adapter', 'quest-rewards', 'model', 'export', 'ranking', 'panel', 'details', 'preferences', 'i18n', 'layout', 'icon', 'styles']
 let bundle = names.map(name => `modules['./${name}']=function(module,exports,require){\n${fs.readFileSync(path.join(root, 'src', name + '.js'), 'utf8')}\n};`).join('\n')
 for (const language of ['en-US', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) bundle += `\nmodules['../i18n/${language}.json']=function(module){module.exports=${fs.readFileSync(path.join(root, 'i18n', language + '.json'), 'utf8')};};`
 const react = fs.readFileSync(path.join(runtime, 'react.production.min.js'), 'utf8')
@@ -37,6 +37,7 @@ apply(state,{v:1,type:'bonus',kind:'eo',at:at('2026-11-04T20:12:32'),amount:200,
 apply(state,{v:1,type:'bonus',kind:'quest',at:at('2026-11-05T16:22:30'),amount:350,mapId:null,questId:854,key:'quest:2026:2:854',label:'Z作战前段 · 任务 854'});
 const yearlyAdapter=require('./adapter').createAdapter();yearlyAdapter.account='12345678';
 apply(state,require('./adapter').decode(yearlyAdapter,{path:'/kcsapi/api_req_quest/clearitemget',time:at('2026-11-16T20:00:00'),body:{},postBody:{api_quest_id:'948'}}).records[0]);
+apply(state,require('./adapter').decode(yearlyAdapter,{path:'/kcsapi/api_req_quest/clearitemget',time:at('2026-11-04T20:13:00'),body:{api_bounus:[{api_type:18,api_count:800,api_item:null}]},postBody:{api_quest_id:'949'}}).records[0]);
 apply(state,{v:1,type:'maps',at:at('2026-11-05T18:00:00'),cleared:[15,55]});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T03:30:00'),period:at('2026-11-05T03:00:00'),entries:[[1,8800],[5,8300],[20,7000],[100,4500],[300,3000],[500,2700]].map(([rank,score])=>({rank,score,self:rank===300}))});
 apply(state,{v:1,type:'ranking',at:at('2026-11-05T16:30:00'),period:at('2026-11-05T15:00:00'),entries:[[1,9000],[5,8500],[20,7200],[100,4800],[250,3200],[500,2800]].map(([rank,score])=>({rank,score,self:rank===250}))});
@@ -105,6 +106,9 @@ async function preview(){
   assert(!doc.querySelector('[data-table="ranking"]').textContent.includes('#501'),'501 anchor must be removed');
   doc.querySelector('[data-day="2026-11-04"]').click();await pause();
   assert(doc.querySelectorAll('[data-hour]').length===24&&!doc.querySelector('.calendar'),'Secondary day view failed');
+  doc.querySelector('[data-action="bonus-quest"]').click();await pause();
+  assert(doc.querySelector('[data-table="bonus"]').textContent.includes('949')&&doc.querySelector('[data-table="bonus"]').textContent.includes('800.00'),'Fallback reward must appear in daily quest details');
+  doc.querySelector('[data-action="close-details"]').click();await pause();
   for(let hour=0;hour<24;hour++)assert(doc.querySelector('[data-hour="'+hour+'"] .tile-value').textContent===tileNumber(report.days[3].slots[hour]),'Hour value mismatch');
   doc.querySelector('[data-hour="20"]').click();await pause();
   assert(doc.querySelector('dialog').open&&doc.querySelector('dialog').ownerDocument===doc,'Hour details must open in this window');
